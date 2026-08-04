@@ -1,0 +1,144 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+max_line_length = 160
+ij_visual_guides = 80, 120
+trim_trailing_whitespace = true
+
+tab_width = 4
+indent_size = 4
+indent_style = space
+ij_continuation_indent_size = 8
+
+[*.{java,kt}]
+ij_any_keep_blank_lines_in_declarations = 1
+ij_any_keep_blank_lines_in_code = 1
+ij_any_keep_blank_lines_before_right_brace = 0
+ij_any_keep_blank_lines_between_package_declaration_and_header = 1
+
+[*.java]
+ij_java_use_single_class_imports = true
+ij_java_packages_to_use_import_on_demand = 999
+ij_java_class_count_to_use_import_on_demand = 999
+ij_java_names_count_to_use_import_on_demand = 999
+
+ij_java_imports_layout = kotlin.**, java.**, |, *, |, ru.**, |, jakarta.**, javax.**, |, $*
+
+ij_java_blank_lines_before_package = 0
+ij_java_blank_lines_after_package = 1
+ij_java_blank_lines_before_imports = 1
+ij_java_blank_lines_after_imports = 1
+ij_java_blank_lines_around_class = 1
+ij_java_blank_lines_after_class_header = 1
+ij_java_blank_lines_before_class_end = 0
+ij_java_blank_lines_after_anonymous_class_header = 1
+ij_java_blank_lines_around_initializer = 1
+ij_java_blank_lines_around_method_in_interface = 1
+ij_java_blank_lines_around_method = 1
+ij_java_blank_lines_before_method_body = 0
+ij_java_blank_lines_around_field_in_interface = 1
+ij_java_blank_lines_around_field = 0
+
+ij_java_keep_simple_classes_in_one_line = true
+ij_java_keep_simple_methods_in_one_line = true
+ij_java_keep_simple_lambdas_in_one_line = true
+
+ij_java_keep_blank_lines_before_right_brace = 1
+ij_java_keep_blank_lines_between_package_declaration_and_header = 1
+ij_java_keep_blank_lines_in_code = 1
+ij_java_keep_blank_lines_in_declarations = 1
+
+ij_java_if_brace_force = always
+ij_java_for_brace_force = always
+ij_java_while_brace_force = always
+ij_java_do_while_brace_force = always
+
+ij_java_enum_constants_wrap = on_every_item
+
+ij_java_method_parameters_wrap = on_every_item
+ij_java_method_parameters_new_line_after_left_paren = true
+ij_java_method_parameters_right_paren_on_new_line = true
+ij_java_align_multiline_method_parentheses = false
+
+ij_java_call_parameters_wrap = on_every_item
+ij_java_align_multiline_parameters = true
+ij_java_align_multiline_parameters_in_calls = true
+
+ij_java_method_call_chain_wrap = on_every_item
+ij_java_align_multiline_chained_methods = false
+
+ij_java_ternary_operation_wrap = on_every_item
+ij_java_align_multiline_ternary_operation = true
+ij_java_ternary_operation_signs_on_next_line = true
+
+ij_java_align_multiline_binary_operation = true
+ij_java_align_multiline_parenthesized_expression = true
+ij_java_binary_operation_sign_on_next_line = true
+
+ij_java_doc_enable_formatting = true
+ij_java_doc_align_param_comments = false
+ij_java_doc_align_exception_comments = false
+ij_java_doc_add_blank_line_after_description = true
+ij_java_doc_add_blank_line_after_param_comments = false
+ij_java_doc_add_blank_line_after_return = false
+ij_java_doc_keep_invalid_tags = false
+ij_java_doc_keep_empty_parameter_tag = true
+ij_java_doc_keep_empty_return_tag = true
+ij_java_doc_keep_empty_throws_tag = true
+ij_java_doc_enable_leading_asterisks = true
+ij_java_doc_use_throws_not_exception_tag = true
+ij_java_doc_add_p_tag_on_empty_lines = false
+ij_java_doc_keep_empty_lines = true
+ij_java_doc_do_not_wrap_if_one_line = false
+ij_java_doc_preserve_line_breaks = false
+ij_java_doc_param_description_on_new_line = false
+ij_java_doc_indent_on_continuation = false
+
+[*.kt]
+ij_kotlin_packages_to_use_import_on_demand = 999
+ij_kotlin_name_count_to_use_star_import = 999
+ij_kotlin_name_count_to_use_star_import_for_members = 999
+ij_kotlin_import_nested_classes = true
+
+ij_kotlin_imports_layout = kotlin.**, java.**, |, *, |, ru.**, |, jakarta.**, javax.**, |, $*
+
+ij_kotlin_blank_lines_after_class_header = 1
+
+ij_kotlin_keep_blank_lines_before_right_brace = 1
+ij_kotlin_keep_blank_lines_in_code = 1
+ij_kotlin_keep_blank_lines_in_declarations = 1
+
+ij_kotlin_enum_constants_wrap = on_every_item
+
+ij_kotlin_method_parameters_wrap = on_every_item
+ij_kotlin_method_parameters_new_line_after_left_paren = true
+ij_kotlin_method_parameters_right_paren_on_new_line = true
+ij_kotlin_align_multiline_method_parentheses = false
+
+ij_kotlin_call_parameters_wrap = on_every_item
+ij_kotlin_align_multiline_parameters = true
+ij_kotlin_align_multiline_parameters_in_calls = true
+
+ij_kotlin_method_call_chain_wrap = on_every_item
+
+ij_kotlin_align_multiline_binary_operation = true
+
+[*.{vue,js,ts}]
+ij_vue_indent_children_of_top_level = template, script, style
+
+ij_javascript_force_quote_style = true
+ij_javascript_use_double_quotes = false
+
+ij_javascript_use_explicit_js_extension = always_js
+ij_typescript_use_explicit_js_extension = always_js
+
+[*.{yaml,yml,json,conf}]
+indent_size = 2
+
+[*.scala]
+indent_size = 2
+max_line_length = 100
