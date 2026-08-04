@@ -1,7 +1,7 @@
 package ru.rcktsci.experiments.ai.sshmcp.config.tools;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.ai.tool.annotation.Tool;
