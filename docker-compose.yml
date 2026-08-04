@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: spring-ssh-mcp
+      POSTGRES_USER: spring-ssh-mcp-user
+      POSTGRES_PASSWORD: spring-ssh-mcp-pass
+    ports:
+      - "5432:5432/tcp"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  spring-ssh-mcp:
+    image: ghcr.io/rcktsci/spring-ssh-mcp:2026-08-04
+    pull_policy: always
+    environment:
+      SERVER_PORT: 3111
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/spring-ssh-mcp
+      SPRING_DATASOURCE_USERNAME: spring-ssh-mcp-user
+      SPRING_DATASOURCE_PASSWORD: spring-ssh-mcp-pass
+      # Change it, please.
+      ENCRYPTION_MASTER_KEY: lY2DWEGueJR6gA3XKftj9PnsMIB1FbZp
+    depends_on:
+      - postgres
+    ports:
+      - "3111:3111/tcp"
+    restart: unless-stopped
