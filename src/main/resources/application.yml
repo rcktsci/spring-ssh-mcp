@@ -1,0 +1,43 @@
+spring:
+  application.name: spring-ssh-mcp
+  main.banner-mode: 'off'
+  ai.mcp.server:
+    protocol: STATELESS
+    instructions: |
+      Manage connections to remote ssh servers via tools:
+      - `list_servers`
+      - `add_server`
+      - `remove_server`
+      Credentials = login + password OR login + private key (optionally with secret).
+      Servers are stored permanently and securely in remote database.
+      Servers are shared across multiple AI-agents/sessions, do not clean them.
+      Rules how to execute commands on ssh-servers:
+      - Generate single sessionId for yourself (AI-agent session identifier, not ssh!)
+      - Use tool `execute`
+      - Describe what you are doing and what you expects in `description` argument
+      - Default timeout 30 sec, can override
+      - Each `execute` creates new SSH session. No manual cleanup needed.
+      Also read ssh-specific skills if any.
+  datasource:
+    url: /* Должен быть указан. */
+    username: /* Должен быть указан. */
+    password: /* Должен быть указан. */
+    hikari:
+      schema: ssh-mcp
+      minimum-idle: 2
+      maximum-pool-size: 10
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: ${spring.datasource.hikari.schema}
+        format_sql: true
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog-master.xml
+    default-schema: ${spring.datasource.hikari.schema}
+
+encryption:
+  master-key: ${ENCRYPTION_MASTER_KEY:default-dev-key-for-testing-only-32chars}

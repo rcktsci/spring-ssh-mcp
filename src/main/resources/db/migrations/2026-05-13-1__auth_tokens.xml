@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="1"
+               author="ssh-mcp">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="auth_tokens"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="auth_tokens">
+            <column name="id"
+                    type="BIGSERIAL"
+                    autoIncrement="true">
+                <constraints primaryKey="true"
+                             primaryKeyName="pk_auth_tokens"
+                             nullable="false"/>
+            </column>
+
+            <column name="token"
+                    type="UUID">
+                <constraints nullable="false"
+                             unique="true"
+                             uniqueConstraintName="uidx_auth_tokens__token"/>
+            </column>
+
+            <column name="can_edit"
+                    type="BOOLEAN"
+                    defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="can_execute"
+                    type="BOOLEAN"
+                    defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="execute_only"
+                    type="VARCHAR(255) []"
+                    defaultValueComputed="'{}'"/>
+
+            <column name="created_at"
+                    type="TIMESTAMP"
+                    defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at"
+                    type="TIMESTAMP"
+                    defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex indexName="idx_auth_tokens_token"
+                     tableName="auth_tokens">
+            <column name="token"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="2"
+               author="ssh-mcp">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="auth_tokens"/>
+            <not>
+                <columnExists tableName="auth_tokens"
+                              columnName="comment"/>
+            </not>
+        </preConditions>
+
+        <addColumn tableName="auth_tokens">
+            <column name="comment"
+                    type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>
