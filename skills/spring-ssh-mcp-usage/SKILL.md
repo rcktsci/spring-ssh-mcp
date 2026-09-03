@@ -45,6 +45,10 @@ execute(reasoningAndExpectations="test", name="server", command="uptime", sessio
 - On timeout `timedOut=true`, output may be partial
 - Exit code = -1 if the command did not finish
 
+#### If you run in OpenCode
+
+**IMPORTANT**: OpenCode has its own limit on tool calling equal to 30 seconds. So setting `timeout` argument higher than 30s is pointless.
+
 ## Troubleshooting
 
 If an error reproduces consistently, contact the MCP server administrator.

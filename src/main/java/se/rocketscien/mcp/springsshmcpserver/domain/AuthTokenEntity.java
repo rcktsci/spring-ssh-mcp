@@ -43,6 +43,9 @@ public class AuthTokenEntity {
     @JdbcTypeCode(SqlTypes.ARRAY)
     private String[] executeOnly = {};
 
+    @Column(name = "is_token_admin", nullable = false)
+    private Boolean isTokenAdmin = false;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

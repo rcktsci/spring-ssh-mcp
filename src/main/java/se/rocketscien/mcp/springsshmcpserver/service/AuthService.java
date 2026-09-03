@@ -2,6 +2,8 @@ package se.rocketscien.mcp.springsshmcpserver.service;
 
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 import se.rocketscien.mcp.springsshmcpserver.config.AuthException;
 import se.rocketscien.mcp.springsshmcpserver.domain.AuthTokenEntity;
 
@@ -29,5 +31,20 @@ public class AuthService {
             return false;
         }
         return token.canExecuteOnServer(name);
+    }
+
+    public UUID currentToken() {
+        var token = CURRENT.isBound() ? CURRENT.get() : null;
+        return token == null ? null : token.getToken();
+    }
+
+    public void requireTokenAdmin() {
+        var token = CURRENT.isBound() ? CURRENT.get() : null;
+        if (token == null) {
+            throw new AuthException("Access denied: no authentication");
+        }
+        if (!Boolean.TRUE.equals(token.getIsTokenAdmin())) {
+            throw new AuthException("Access denied: missing role TOKEN_ADMIN");
+        }
     }
 }

@@ -22,6 +22,7 @@ public class BaseCallToolTest extends BaseApplicationTest {
     protected static final String EDIT_ONLY_TOKEN = "550e8400-e29b-41d4-a716-446655440002";
     protected static final String WILDCARD_TOKEN = "550e8400-e29b-41d4-a716-446655440003";
     protected static final String NO_PERMS_TOKEN = "550e8400-e29b-41d4-a716-446655440010";
+    protected static final String TOKEN_ADMIN_TOKEN = "550e8400-e29b-41d4-a716-446655440020";
 
     @BeforeEach
     void setupTokens() {
@@ -30,15 +31,45 @@ public class BaseCallToolTest extends BaseApplicationTest {
         registerAuthToken(EDIT_ONLY_TOKEN, true, false);
         registerAuthToken(WILDCARD_TOKEN, false, true, "vm/*");
         registerAuthToken(NO_PERMS_TOKEN, false, false);
+        registerAuthToken(TOKEN_ADMIN_TOKEN, true, true, true);
     }
 
-    private void registerAuthToken(String token, boolean canEdit, boolean canExecute, String... executeOnly) {
+    protected void registerAuthToken(String token, boolean canEdit, boolean canExecute, String... executeOnly) {
+        registerAuthToken(token, canEdit, canExecute, false, executeOnly);
+    }
+
+    protected void registerAuthToken(String token, boolean canEdit, boolean canExecute, boolean isTokenAdmin, String... executeOnly) {
         var authToken = new AuthTokenEntity();
         authToken.setToken(UUID.fromString(token));
         authToken.setCanEdit(canEdit);
         authToken.setCanExecute(canExecute);
         authToken.setExecuteOnly(executeOnly);
+        authToken.setIsTokenAdmin(isTokenAdmin);
         authTokenRepository.save(authToken);
+    }
+
+    protected String listAccessTokens() {
+        return callTool(TOKEN_ADMIN_TOKEN, "list_access_tokens", Map.of());
+    }
+
+    protected String listAccessTokens(String token) {
+        return callTool(token, "list_access_tokens", Map.of());
+    }
+
+    protected String upsertAccessToken(Map<String, Object> args) {
+        return upsertAccessToken(args, TOKEN_ADMIN_TOKEN);
+    }
+
+    protected String upsertAccessToken(Map<String, Object> args, String token) {
+        return callTool(token, "upsert_access_token", args);
+    }
+
+    protected String deleteAccessToken(String targetToken) {
+        return deleteAccessToken(targetToken, TOKEN_ADMIN_TOKEN);
+    }
+
+    protected String deleteAccessToken(String targetToken, String token) {
+        return callTool(token, "delete_access_token", Map.of("token", targetToken));
     }
 
     protected String listServers() {

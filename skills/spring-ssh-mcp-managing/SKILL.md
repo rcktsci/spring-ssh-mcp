@@ -4,6 +4,7 @@ description: |
     Activate when user asks for:
     - Add/edit/check/remove a connection to a remote SSH server
     - Grant SSH access to another AI agent, manage key-based auth and permissions
+    - Create / list / revoke MCP access tokens (TOKEN_ADMIN role)
     To run commands via SSH on remote servers, activate the other skill: `spring-ssh-mcp-usage`.
 ---
 
@@ -88,9 +89,10 @@ Tokens are used by MCP clients as **Bearer tokens** in the `Authorization` heade
 Authorization: Bearer <token-uuid>
 ```
 
-One token = one set of permissions (`can_edit`, `can_execute`, `execute_only`) and an owner binding via `comment`.
+One token = one set of permissions (`can_edit`, `can_execute`, `execute_only`, `is_token_admin`) and an owner binding via `comment`.
 The server authorizes the client by the token, after which the client can call the tools (`add_server_connection`, `execute`,
-`list_servers`, `remove_server_connection`, `rename_server_connection`, `generate_session_id`).
+`list_servers`, `remove_server_connection`, `rename_server_connection`, `generate_session_id`, `list_access_tokens`,
+`upsert_access_token`, `delete_access_token`).
 
 ### Privilege model
 
@@ -103,6 +105,8 @@ through their own AI agent.
 - **`can_edit = false`** — granted to other AI agents that only need to run commands.
   Almost always paired with an `execute_only` glob restriction — it pins down which VMs the agent can access.
   `comment` holds the human/system that owns the agent.
+- **`is_token_admin = true`** — only for tokens that manage other tokens via MCP
+  (`list_access_tokens` / `upsert_access_token` / `delete_access_token`). A token cannot modify or delete itself.
 
 ### Connecting
 
@@ -120,6 +124,7 @@ docker exec postgres psql -U <db-user> -d <database> -c ...
 | `can_edit`                  | boolean         | allowed to edit the server list                                   |
 | `can_execute`               | boolean         | allowed to run commands                                           |
 | `execute_only`              | varchar(255)[]  | glob whitelist (if empty — all servers, otherwise — only matches) |
+| `is_token_admin`            | boolean         | allowed to manage other tokens via MCP                            |
 | `created_at` / `updated_at` | timestamp       | now() by default                                                  |
 | `comment`                   | varchar(255)    | free-form description (usually owner identification)              |
 
@@ -154,6 +159,71 @@ RETURNING id, token, can_execute, can_edit, execute_only, comment;"
 - The `ssh-mcp` schema must be wrapped in double quotes (otherwise a syntax error occurs on the hyphen).
 - `ARRAY[...]` or `'{...}'::varchar[]` — both forms are valid for Postgres.
 - Only `gen_random_uuid()` (no need for `uuid-ossp` — it is built-in since PG 13+).
+
+### Managing tokens via MCP (TOKEN_ADMIN role)
+
+Tokens with `is_token_admin = TRUE` can manage other tokens through MCP tools — no direct DB access required.
+Use SQL only for bootstrapping the very first `is_token_admin = TRUE` token.
+
+| Tool                 | Purpose                                                              |
+|----------------------|----------------------------------------------------------------------|
+| `list_access_tokens` | List all tokens (full UUIDs, roles, `execute_only`, `created_at`)    |
+| `upsert_access_token`| Create or update a token; returns the full token value (visible once) |
+| `delete_access_token` | Delete a token by UUID                                              |
+
+Restrictions:
+
+- All three require a token with `is_token_admin = TRUE`. Without it — `Access denied: missing role TOKEN_ADMIN`.
+- A token cannot modify or delete **itself**.
+- `upsert_access_token` applies **partial update** on `overwrite=true`: only fields you pass are changed; omitted fields keep their current values.
+
+#### Bootstrapping the first TOKEN_ADMIN
+
+The first `is_token_admin = TRUE` token must be created directly in the DB (no admin token exists yet to call the tools):
+
+```bash
+docker exec postgres psql -U <db-user> -d <database> -c "
+INSERT INTO \"ssh-mcp\".auth_tokens (token, can_edit, can_execute, is_token_admin, comment)
+VALUES (gen_random_uuid(), TRUE, TRUE, TRUE, 'Bootstrap admin')
+RETURNING token;"
+```
+
+Store the returned UUID — it will not be shown again by the MCP tools. Use it as the `Bearer` token to call `list_access_tokens` / `upsert_access_token` / `delete_access_token` afterwards.
+
+#### Examples
+
+List every token:
+
+```
+list_access_tokens()
+```
+
+Create a new execute-only token (UUID is generated, returned in the response):
+
+```
+upsert_access_token(canExecute=true, executeOnly=["vm/server-01"], comment="Owner Name")
+```
+
+Create a token with an explicit UUID:
+
+```
+upsert_access_token(token="11111111-2222-3333-4444-555555555555",
+                    canEdit=false, canExecute=true, isTokenAdmin=false,
+                    executeOnly=["vm/*"], comment="ops")
+```
+
+Update an existing token (only the fields you pass are applied):
+
+```
+upsert_access_token(token="11111111-2222-3333-4444-555555555555",
+                    canExecute=false, overwrite=true)
+```
+
+Delete a token:
+
+```
+delete_access_token(token="11111111-2222-3333-4444-555555555555")
+```
 
 ### Verification after INSERT
 
