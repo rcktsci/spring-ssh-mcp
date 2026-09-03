@@ -1,0 +1,3 @@
+bootstrap:
+  admin-token:
+    enabled: false

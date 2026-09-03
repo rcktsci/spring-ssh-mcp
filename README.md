@@ -37,13 +37,15 @@ A token cannot modify or delete itself.
 
 ### Bootstrapping the first token-admin
 
-The first `TOKEN_ADMIN` must be created directly in the database (no token exists yet to call the tools):
+On startup, if no token with `is_token_admin = true` exists in the database, the server auto-generates one and prints it to the logs at `WARN` level:
 
-```sql
-INSERT INTO "ssh-mcp".auth_tokens (token, can_edit, can_execute, is_token_admin)
-VALUES (gen_random_uuid(), true, true, true)
-RETURNING token;
 ```
+BOOTSTRAP-ADMIN-TOKEN: <uuid> -- store this UUID now, it will not be shown again
+```
+
+Save the UUID immediately — it is the only time the token value is shown. Use it as the `Authorization: Bearer <uuid>` header to call `list_access_tokens` / `upsert_access_token` / `delete_access_token`, then create a permanent admin token through the MCP tools and delete the bootstrap one.
+
+To disable auto-bootstrap (for example, in production where the first admin is provisioned by an external process), set `BOOTSTRAP_ADMIN_TOKEN=false` or `bootstrap.admin-token.enabled=false` in configuration.
 
 ## Running with Docker Compose
 

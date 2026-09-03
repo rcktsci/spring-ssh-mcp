@@ -21,6 +21,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: spring-ssh-mcp-pass
       # Change it, please.
       ENCRYPTION_MASTER_KEY: lY2DWEGueJR6gA3XKftj9PnsMIB1FbZp
+      # Set to false to disable auto-bootstrap of the first TOKEN_ADMIN (when the first admin is provisioned externally).
+      BOOTSTRAP_ADMIN_TOKEN: true
     depends_on:
       - postgres
     ports:

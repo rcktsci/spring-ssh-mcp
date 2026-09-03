@@ -41,3 +41,7 @@ spring:
 
 encryption:
   master-key: ${ENCRYPTION_MASTER_KEY:default-dev-key-for-testing-only-32chars}
+
+bootstrap:
+  admin-token:
+    enabled: ${BOOTSTRAP_ADMIN_TOKEN:true}

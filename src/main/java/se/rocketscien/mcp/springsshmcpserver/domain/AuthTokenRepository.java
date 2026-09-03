@@ -10,4 +10,6 @@ import org.springframework.stereotype.Repository;
 public interface AuthTokenRepository extends JpaRepository<AuthTokenEntity, Long> {
 
     Optional<AuthTokenEntity> findByToken(UUID token);
+
+    boolean existsByIsTokenAdminTrue();
 }
