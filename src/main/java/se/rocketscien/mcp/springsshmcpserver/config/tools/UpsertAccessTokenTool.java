@@ -34,6 +34,7 @@ public class UpsertAccessTokenTool {
             @ToolParam(description = "Whether the token can edit server connections", required = false) Boolean canEdit,
             @ToolParam(description = "Whether the token can execute commands", required = false) Boolean canExecute,
             @ToolParam(description = "Glob patterns of server names the token is allowed to execute on (empty = all)", required = false) String[] executeOnly,
+            @ToolParam(description = "Free-form operator note (max 255 chars). Null = leave unchanged; empty string = clear the note.", required = false) String comment,
             @ToolParam(description = "Whether the token can manage other access tokens", required = false) Boolean isTokenAdmin,
             @ToolParam(description = "Overwrite an existing token with the same UUID (default false)", required = false) Boolean overwrite
     ) {
@@ -83,6 +84,12 @@ public class UpsertAccessTokenTool {
                 entity.setExecuteOnly(executeOnly);
             } else if (!isUpdate) {
                 entity.setExecuteOnly(new String[0]);
+            }
+            if (comment != null) {
+                if (comment.length() > 255) {
+                    return objectMapper.writeValueAsString(new ErrorResult("comment exceeds 255 characters"));
+                }
+                entity.setComment(comment.isEmpty() ? null : comment);
             }
             if (isTokenAdmin != null) {
                 if (isUpdate && Boolean.TRUE.equals(isTokenAdmin) && entity.getToken().equals(authService.currentToken())) {

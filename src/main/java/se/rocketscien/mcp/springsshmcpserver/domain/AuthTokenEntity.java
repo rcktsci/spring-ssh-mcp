@@ -43,6 +43,9 @@ public class AuthTokenEntity {
     @JdbcTypeCode(SqlTypes.ARRAY)
     private String[] executeOnly = {};
 
+    @Column(length = 255)
+    private String comment;
+
     @Column(name = "is_token_admin", nullable = false)
     private Boolean isTokenAdmin = false;
 

@@ -21,7 +21,7 @@ MCP server for accessing remote SSH servers.
 | `remove_server_connection` | Remove a connection                                         | EDIT          |
 | `generate_session_id`      | Generate a `sessionId` for a subsequent `execute` call      |               |
 | `execute`                  | Execute a command                                           | EXECUTE       |
-| `list_access_tokens`       | List all access tokens (full UUIDs, roles, executeOnly)     | TOKEN_ADMIN   |
+| `list_access_tokens`       | List all access tokens (full UUIDs, roles, executeOnly, comment) | TOKEN_ADMIN   |
 | `upsert_access_token`      | Create or update an access token (returns full token value) | TOKEN_ADMIN   |
 | `delete_access_token`      | Delete an access token                                      | TOKEN_ADMIN   |
 
@@ -32,6 +32,7 @@ Tokens are bearer UUIDs stored in the `auth_tokens` table. Each token carries:
 - `can_edit` — allows managing server connections (`add_server_connection`, `rename_server_connection`, `remove_server_connection`).
 - `can_execute` — allows running `execute`. Restricted by `execute_only` glob patterns over server names; empty array means unrestricted.
 - `is_token_admin` — allows managing access tokens via `list_access_tokens`, `upsert_access_token`, `delete_access_token`.
+- `comment` — free-form operator note (e.g. owner identification), max 255 chars. On `upsert_access_token`: `null` keeps the current value; empty string clears it.
 
 A token cannot modify or delete itself.
 

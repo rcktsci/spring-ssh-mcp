@@ -25,7 +25,7 @@ public class ListAccessTokensTool {
     @SneakyThrows
     @Tool(
             name = "list_access_tokens",
-            description = "List all access tokens (token value, canEdit, canExecute, isTokenAdmin, executeOnly, createdAt). Requires token-admin role."
+            description = "List all access tokens (token value, canEdit, canExecute, isTokenAdmin, executeOnly, comment, createdAt). Requires token-admin role."
     )
     public String listAccessTokens() {
         try {
@@ -38,6 +38,7 @@ public class ListAccessTokensTool {
                             Boolean.TRUE.equals(t.getCanExecute()),
                             Boolean.TRUE.equals(t.getIsTokenAdmin()),
                             t.getExecuteOnly(),
+                            t.getComment(),
                             t.getCreatedAt()))
                     .toList();
 
@@ -58,6 +59,7 @@ public class ListAccessTokensTool {
             @JsonProperty("canExecute") boolean canExecute,
             @JsonProperty("isTokenAdmin") boolean isTokenAdmin,
             @JsonProperty("executeOnly") String[] executeOnly,
+            @JsonProperty("comment") String comment,
             @JsonProperty("createdAt") java.time.LocalDateTime createdAt) {
     }
 }

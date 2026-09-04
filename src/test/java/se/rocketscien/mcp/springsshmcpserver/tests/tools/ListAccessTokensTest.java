@@ -52,4 +52,24 @@ class ListAccessTokensTest extends BaseCallToolTest {
         var text = getResponseText(callTool(null, "list_access_tokens", java.util.Map.of()));
         assertThat(text).contains("error");
     }
+
+    @Test
+    void list_access_tokens_includes_comment_field() {
+        var newToken = java.util.UUID.randomUUID().toString();
+        upsertAccessToken(java.util.Map.of(
+                "token", newToken,
+                "canExecute", true,
+                "comment", "owner-X"));
+
+        var json = objectMapper.readTree(getResponseText(listAccessTokens()));
+        JsonNode found = null;
+        for (JsonNode t : json.get("tokens")) {
+            if (newToken.equals(t.get("token").asText())) {
+                found = t;
+                break;
+            }
+        }
+        assertThat(found).isNotNull();
+        assertThat(found.get("comment").asText()).isEqualTo("owner-X");
+    }
 }

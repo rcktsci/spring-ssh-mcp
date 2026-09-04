@@ -117,4 +117,51 @@ class UpsertAccessTokenTest extends BaseCallToolTest {
         assertThat(saved.canExecuteOnServer("db-2")).isTrue();
         assertThat(saved.canExecuteOnServer("cache-1")).isFalse();
     }
+
+    @Test
+    void upsert_access_token_with_comment_persisted() {
+        var newToken = UUID.randomUUID().toString();
+        upsertAccessToken(Map.of(
+                "token", newToken,
+                "canExecute", true,
+                "comment", "ops rotation 2026-Q3"));
+
+        var saved = authTokenRepository.findByToken(UUID.fromString(newToken)).orElseThrow();
+        assertThat(saved.getComment()).isEqualTo("ops rotation 2026-Q3");
+    }
+
+    @Test
+    void upsert_access_token_partial_update_omitted_comment_preserves_value() {
+        var newToken = UUID.randomUUID().toString();
+        upsertAccessToken(Map.of("token", newToken, "canExecute", true, "comment", "keep me"));
+        upsertAccessToken(Map.of(
+                "token", newToken,
+                "canExecute", false,
+                "overwrite", true));
+
+        var saved = authTokenRepository.findByToken(UUID.fromString(newToken)).orElseThrow();
+        assertThat(saved.getCanExecute()).isFalse();
+        assertThat(saved.getComment()).isEqualTo("keep me");
+    }
+
+    @Test
+    void upsert_access_token_empty_string_clears_comment() {
+        var newToken = UUID.randomUUID().toString();
+        upsertAccessToken(Map.of("token", newToken, "canExecute", true, "comment", "to be cleared"));
+        upsertAccessToken(Map.of(
+                "token", newToken,
+                "comment", "",
+                "overwrite", true));
+
+        var saved = authTokenRepository.findByToken(UUID.fromString(newToken)).orElseThrow();
+        assertThat(saved.getComment()).isNull();
+    }
+
+    @Test
+    void upsert_access_token_comment_exceeding_255_chars_returns_error() {
+        var tooLong = "a".repeat(256);
+        var text = getResponseText(upsertAccessToken(Map.of("canExecute", true, "comment", tooLong)));
+        assertThat(text).contains("error");
+        assertThat(text).contains("255");
+    }
 }

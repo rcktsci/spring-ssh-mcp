@@ -167,7 +167,7 @@ Use SQL only for bootstrapping the very first `is_token_admin = TRUE` token.
 
 | Tool                 | Purpose                                                              |
 |----------------------|----------------------------------------------------------------------|
-| `list_access_tokens` | List all tokens (full UUIDs, roles, `execute_only`, `created_at`)    |
+| `list_access_tokens` | List all tokens (full UUIDs, roles, `execute_only`, `comment`, `created_at`) |
 | `upsert_access_token`| Create or update a token; returns the full token value (visible once) |
 | `delete_access_token` | Delete a token by UUID                                              |
 
@@ -176,6 +176,7 @@ Restrictions:
 - All three require a token with `is_token_admin = TRUE`. Without it — `Access denied: missing role TOKEN_ADMIN`.
 - A token cannot modify or delete **itself**.
 - `upsert_access_token` applies **partial update** on `overwrite=true`: only fields you pass are changed; omitted fields keep their current values.
+- `comment`: `null` keeps the current value; an empty string clears the note.
 
 #### Bootstrapping the first TOKEN_ADMIN
 
