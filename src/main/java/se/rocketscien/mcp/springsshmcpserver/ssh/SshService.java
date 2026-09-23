@@ -1,6 +1,8 @@
 package se.rocketscien.mcp.springsshmcpserver.ssh;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -33,6 +35,7 @@ public class SshService {
     public SshExecutionResult executeCommand(ServerEntity server, String command, int timeoutSeconds,
                                              Map<String, String> environmentVariables) {
         String effectiveCommand = withEnvironmentVariables(command, environmentVariables);
+        ensurePayloadFits(effectiveCommand);
         var host = server.getHost();
         var port = server.getPort();
         log.info("Connecting to {}:{} as {}", host, port, server.getUsername());
@@ -60,11 +63,31 @@ public class SshService {
                 sshClient.authPublickey(server.getUsername(), keyProvider);
             }
 
+            int envCount = environmentVariables == null ? 0 : environmentVariables.size();
+            log.info("Executing command on {}:{} ({} env var(s)): '{}'", host, port, envCount, abbreviate(command));
             return executeInternal(sshClient, effectiveCommand, timeoutSeconds);
+        } catch (IOException ex) {
+            log.error("SSH I/O failure on {}:{} - {}", host, port, describe(ex), ex);
+            throw new RuntimeException("SSH connection error (connection lost or channel rejected): " + describe(ex), ex);
         } catch (Exception ex) {
-            log.error("SSH execution failed on {}:{} - {}", host, port, ex.getMessage(), ex);
-            throw new RuntimeException("SSH execution failed: " + ex.getMessage(), ex);
+            log.error("SSH execution failed on {}:{} - {}", host, port, describe(ex), ex);
+            throw new RuntimeException("SSH execution failed: " + describe(ex), ex);
         }
+    }
+
+    private static final int MAX_PAYLOAD_BYTES = 64 * 1024;
+
+    private static void ensurePayloadFits(String effectiveCommand) {
+        int size = effectiveCommand.getBytes(StandardCharsets.UTF_8).length;
+        if (size > MAX_PAYLOAD_BYTES) {
+            throw new IllegalArgumentException("Command payload too large: " + size + " bytes (max "
+                    + MAX_PAYLOAD_BYTES + "). Shorten the command or reduce environment variable values.");
+        }
+    }
+
+    private static String describe(Throwable ex) {
+        String message = ex.getMessage();
+        return message == null || message.isBlank() ? ex.getClass().getSimpleName() : message;
     }
 
     private static String withEnvironmentVariables(String command, Map<String, String> environmentVariables) {
@@ -87,10 +110,18 @@ public class SshService {
         return value == null ? "" : value.replace("'", "'\\''");
     }
 
+    private static final int MAX_LOGGED_COMMAND_CHARS = 200;
+
+    private static String abbreviate(String command) {
+        if (command == null || command.length() <= MAX_LOGGED_COMMAND_CHARS) {
+            return command;
+        }
+        return command.substring(0, MAX_LOGGED_COMMAND_CHARS) + "... (" + command.length() + " chars)";
+    }
+
     @SneakyThrows
     @NonNull
     private SshExecutionResult executeInternal(SSHClient sshClient, String command, int timeoutSeconds) {
-        log.info("Executing command: '{}' with timeout {} seconds", command, timeoutSeconds);
         final boolean[] timedOut = {false};
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 

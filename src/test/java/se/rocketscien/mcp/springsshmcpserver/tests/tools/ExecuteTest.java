@@ -41,6 +41,18 @@ class ExecuteTest extends BaseCallToolTest {
     }
 
     @Test
+    void unreachable_server_returns_clear_connection_error() {
+        callTool(FULL_ACCESS_TOKEN, "add_server_connection", Map.of(
+                "name", "unreachable",
+                "host", "127.0.0.1",
+                "port", 1,
+                "username", "root",
+                "password", "x"));
+        var text = getResponseText(execute("unreachable", "whoami", "unreachable-session", 5));
+        assertThat(text).contains("SSH connection error");
+    }
+
+    @Test
     void special_characters_in_output() {
         addServerConnection("test-ssh");
         var r = getExecResult(execute("test-ssh", "printf 'Hello\\nWorld\\t!'", "session-5", 10));
@@ -219,6 +231,31 @@ class ExecuteTest extends BaseCallToolTest {
         var text = getResponseText(executeWithEnv("test-ssh", "whoami", "env-invalid", 10,
                 Map.of("1BAD", "x")));
         assertThat(text).contains("Invalid environment variable name");
+    }
+
+    @Test
+    void oversized_command_returns_payload_too_large_error() {
+        addServerConnection("test-ssh");
+        String huge = "a".repeat(80_000);
+        var text = getResponseText(execute("test-ssh", "echo " + huge, "oversize-cmd", 10));
+        assertThat(text).contains("too large");
+    }
+
+    @Test
+    void oversized_environment_variable_returns_payload_too_large_error() {
+        addServerConnection("test-ssh");
+        var text = getResponseText(executeWithEnv("test-ssh", "echo ok", "oversize-env", 10,
+                Map.of("BIG", "x".repeat(80_000))));
+        assertThat(text).contains("too large");
+    }
+
+    @Test
+    void moderately_large_environment_variable_is_accepted() {
+        addServerConnection("test-ssh");
+        var r = getExecResult(executeWithEnv("test-ssh", "printf '%s' \"$BIG\" | wc -c", "large-env-ok", 10,
+                Map.of("BIG", "y".repeat(10_000))));
+        assertThat(r.get("stdout").asText().trim()).isEqualTo("10000");
+        assertThat(r.get("exit_code").asInt()).isEqualTo(0);
     }
 
     @Test
