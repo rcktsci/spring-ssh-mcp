@@ -76,7 +76,7 @@ public class BaseApplicationTest {
     protected ObjectMapper objectMapper;
 
     @LocalServerPort
-    private int localServerPort;
+    protected int localServerPort;
 
     protected final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))

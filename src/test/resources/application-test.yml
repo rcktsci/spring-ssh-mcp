@@ -1,3 +1,6 @@
 bootstrap:
   admin-token:
     enabled: false
+
+ui:
+  master-key: test-ui-master-key

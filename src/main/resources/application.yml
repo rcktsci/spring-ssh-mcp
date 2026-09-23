@@ -45,3 +45,6 @@ encryption:
 bootstrap:
   admin-token:
     enabled: ${BOOTSTRAP_ADMIN_TOKEN:true}
+
+ui:
+  master-key: ${UI_MASTER_KEY:}

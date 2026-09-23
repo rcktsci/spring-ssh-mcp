@@ -84,6 +84,100 @@ public class ServerManagementService {
         serverRepository.save(server);
     }
 
+    /**
+     * Partial update: a {@code null} argument means "leave as is", a blank one is rejected. The secrets are
+     * applied in a fixed order, and this is the part that must not lose data:
+     * <ul>
+     *   <li>a {@code password} switches the server to {@code PASSWORD} and drops key and passphrase;</li>
+     *   <li>a {@code privateKey} drops the password and keeps the stored passphrase, unless a
+     *       {@code privateKeySecret} sent with it replaces that one;</li>
+     *   <li>a lone {@code privateKeySecret} replaces the passphrase of a key server and is ignored on a
+     *       password server: honoring it there would clear the password the caller never mentioned and leave
+     *       the server with no secret at all, the {@code authType} of {@code NONE} that no API call can
+     *       produce.</li>
+     * </ul>
+     */
+    public ServerEntity updateServer(
+            Long id, String name, String host, Integer port, String username,
+            String password, String privateKey, String privateKeySecret
+    ) {
+        var server = serverRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Server not found: " + id));
+
+        // A blank secret is an unfilled field, not "set the secret to empty": addServer stores an empty
+        // password as a real one, but here it would overwrite a working secret with nothing.
+        var newPassword = blankToNull(password);
+        var newPrivateKey = blankToNull(privateKey);
+        var newPrivateKeySecret = blankToNull(privateKeySecret);
+        if (newPassword != null && newPrivateKey != null) {
+            throw new IllegalArgumentException("Exactly one of password or private key must be provided");
+        }
+
+        // Validated before anything is written, so a rejected request leaves the entity untouched.
+        rejectBlank(name, "name");
+        rejectBlank(host, "host");
+        rejectBlank(username, "username");
+        if (name != null) {
+            var sameName = serverRepository.findByName(name);
+            // The edited server matches itself, otherwise the form's prefilled name would reject every edit.
+            if (sameName.isPresent() && !sameName.get().getId().equals(id)) {
+                throw new IllegalArgumentException("Server '" + name + "' already exists");
+            }
+        }
+
+        if (name != null) {
+            server.setName(name);
+        }
+        if (host != null) {
+            server.setHost(host);
+        }
+        if (username != null) {
+            server.setUsername(username);
+        }
+        if (port != null) {
+            server.setPort(port);
+        }
+
+        applySecrets(server, newPassword, newPrivateKey, newPrivateKeySecret);
+
+        return serverRepository.save(server);
+    }
+
+    private void applySecrets(ServerEntity server, String password, String privateKey, String privateKeySecret) {
+        if (password != null) {
+            server.setPassword(encryptSecret(password));
+            server.setPrivateKey(null);
+            server.setPrivateKeySecret(null);
+            return;
+        }
+        if (privateKey != null) {
+            server.setPassword(null);
+            server.setPrivateKey(encryptSecret(privateKey));
+            if (privateKeySecret != null) {
+                server.setPrivateKeySecret(encryptSecret(privateKeySecret));
+            }
+            return;
+        }
+        if (privateKeySecret != null && server.getPrivateKey() != null) {
+            server.setPrivateKeySecret(encryptSecret(privateKeySecret));
+        }
+    }
+
+    private String encryptSecret(String value) {
+        return EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(value);
+    }
+
+    /** {@code null} means "leave as is", so only a value that is present and blank is rejected. */
+    private static void rejectBlank(String value, String field) {
+        if (value != null && value.isBlank()) {
+            throw new IllegalArgumentException("'" + field + "' is required");
+        }
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
     public ExecutionHistoryEntity execute(String sessionId, String name, String command, Integer timeoutSeconds,
                                           Map<String, String> environmentVariables) {
         ServerEntity server = serverRepository.findByName(name)

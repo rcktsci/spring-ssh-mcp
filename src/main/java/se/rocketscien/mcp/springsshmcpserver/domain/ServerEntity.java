@@ -49,4 +49,18 @@ public class ServerEntity {
     public String getAddress() {
         return username + "@" + host + ":" + port;
     }
+
+    /**
+     * Derived from the stored secrets, not a column: the entity uses field access ({@code @Id} sits on a
+     * field), so this getter is invisible to Hibernate.
+     */
+    public String getAuthType() {
+        if (password != null) {
+            return "PASSWORD";
+        }
+        if (privateKey == null) {
+            return "NONE";
+        }
+        return privateKeySecret != null ? "PRIVATE_KEY_WITH_PASS" : "PRIVATE_KEY";
+    }
 }

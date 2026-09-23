@@ -53,6 +53,12 @@ To disable auto-bootstrap (for example, in production where the first admin is p
 
 See [docker-compose.yml](docker-compose.yml). Run with `docker compose up -d`.
 
+## Web UI
+
+Admin panel: `http://<hostname>:3111/`. Add/edit/remove servers and auth tokens.
+
+Auth is the `UI_MASTER_KEY` environment variable, sent as the `X-UI-Key` header.
+
 ## Connecting to OpenCode
 
 ```json
