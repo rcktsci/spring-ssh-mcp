@@ -49,6 +49,7 @@ execute(reasoningAndExpectations="Check deployed version via env", name="server"
 ```
 
 - Applied only to the current `execute` call (each call is a standalone SSH session).
+- Values are not stored in the execution history: the recorded command is the original one, without the env prefix.
 - Names must match `[A-Za-z_][A-Za-z0-9_]*`; an invalid name returns an error.
 - Values may contain spaces, quotes, and shell metacharacters — they are passed literally.
 

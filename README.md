@@ -8,7 +8,7 @@ MCP server for accessing remote SSH servers.
 - Passwords, keys, and passphrases are stored encrypted in PostgreSQL
 - Bearer token authorization (two roles: EDIT/EXECUTE, wildcard-based server filtering), tokens stored in PostgreSQL
 - Command history table keyed by `sessionId`
-- Per-command environment variables (`environmentVariables` argument of `execute`)
+- Per-command environment variables (`environmentVariables` argument of `execute`); applied only to that call and not stored in the execution history
 - Command execution timeouts
 - Transport: Stateless Streamable HTTP
 
