@@ -84,14 +84,15 @@ public class ServerManagementService {
         serverRepository.save(server);
     }
 
-    public ExecutionHistoryEntity execute(String sessionId, String name, String command, Integer timeoutSeconds) {
+    public ExecutionHistoryEntity execute(String sessionId, String name, String command, Integer timeoutSeconds,
+                                          Map<String, String> environmentVariables) {
         ServerEntity server = serverRepository.findByName(name)
                 .orElseThrow(() -> new IllegalArgumentException("Server not found: " + name));
 
         int timeout = timeoutSeconds != null && timeoutSeconds > 0 ? timeoutSeconds : DEFAULT_TIMEOUT;
 
         SshService.SshExecutionResult result = sshService.executeCommand(
-                server, command, timeout
+                server, command, timeout, environmentVariables
         );
 
         ExecutionHistoryEntity exec = new ExecutionHistoryEntity();

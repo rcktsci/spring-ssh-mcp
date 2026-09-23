@@ -39,6 +39,19 @@ execute(reasoningAndExpectations="test", name="server", command="uptime", sessio
 
 `reasoningAndExpectations` is a required parameter: describe briefly what the command does, whether it is destructive, and what you expect.
 
+### Environment variables
+
+`environmentVariables` is an optional `Map<String, String>` set for the command on the remote server:
+
+```
+execute(reasoningAndExpectations="Check deployed version via env", name="server",
+        command="./deploy.sh", sessionId=sess, environmentVariables={"STAGE": "prod", "TOKEN": "abc"})
+```
+
+- Applied only to the current `execute` call (each call is a standalone SSH session).
+- Names must match `[A-Za-z_][A-Za-z0-9_]*`; an invalid name returns an error.
+- Values may contain spaces, quotes, and shell metacharacters — they are passed literally.
+
 ### Timeouts
 
 - 0 or negative → 30 seconds by default

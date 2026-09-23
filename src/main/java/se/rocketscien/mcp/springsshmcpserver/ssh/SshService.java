@@ -1,7 +1,9 @@
 package se.rocketscien.mcp.springsshmcpserver.ssh;
 
 import java.io.ByteArrayOutputStream;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
@@ -28,7 +30,9 @@ public class SshService {
     public record SshExecutionResult(String stdout, int exitCode, boolean timedOut) {
     }
 
-    public SshExecutionResult executeCommand(ServerEntity server, String command, int timeoutSeconds) {
+    public SshExecutionResult executeCommand(ServerEntity server, String command, int timeoutSeconds,
+                                             Map<String, String> environmentVariables) {
+        String effectiveCommand = withEnvironmentVariables(command, environmentVariables);
         var host = server.getHost();
         var port = server.getPort();
         log.info("Connecting to {}:{} as {}", host, port, server.getUsername());
@@ -56,11 +60,31 @@ public class SshService {
                 sshClient.authPublickey(server.getUsername(), keyProvider);
             }
 
-            return executeInternal(sshClient, command, timeoutSeconds);
+            return executeInternal(sshClient, effectiveCommand, timeoutSeconds);
         } catch (Exception ex) {
             log.error("SSH execution failed on {}:{} - {}", host, port, ex.getMessage(), ex);
             throw new RuntimeException("SSH execution failed: " + ex.getMessage(), ex);
         }
+    }
+
+    private static String withEnvironmentVariables(String command, Map<String, String> environmentVariables) {
+        if (environmentVariables == null || environmentVariables.isEmpty()) {
+            return command;
+        }
+        String assignments = environmentVariables.entrySet().stream()
+                .map(entry -> {
+                    String name = entry.getKey();
+                    if (name == null || !name.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+                        throw new IllegalArgumentException("Invalid environment variable name: " + name);
+                    }
+                    return name + "='" + escapeSingleQuotes(entry.getValue()) + "'";
+                })
+                .collect(Collectors.joining(" "));
+        return "export " + assignments + "; " + command;
+    }
+
+    private static String escapeSingleQuotes(String value) {
+        return value == null ? "" : value.replace("'", "'\\''");
     }
 
     @SneakyThrows

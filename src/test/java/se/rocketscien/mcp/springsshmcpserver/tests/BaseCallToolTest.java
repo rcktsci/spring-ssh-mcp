@@ -134,13 +134,31 @@ public class BaseCallToolTest extends BaseApplicationTest {
     }
 
     protected String execute(String name, String command, String sessionId, Integer timeoutSeconds, String token) {
-        return callTool(token, "execute", Map.of(
-                "reasoningAndExpectations", "test",
-                "name", name,
-                "command", command,
-                "sessionId", sessionId,
-                "timeoutSeconds", timeoutSeconds != null ? timeoutSeconds : 30
-        ));
+        return callTool(token, "execute", executeArgs(name, command, sessionId, timeoutSeconds, null));
+    }
+
+    protected String executeWithEnv(String name, String command, String sessionId, Integer timeoutSeconds,
+                                    Map<String, Object> environmentVariables) {
+        return executeWithEnv(name, command, sessionId, timeoutSeconds, FULL_ACCESS_TOKEN, environmentVariables);
+    }
+
+    protected String executeWithEnv(String name, String command, String sessionId, Integer timeoutSeconds, String token,
+                                    Map<String, Object> environmentVariables) {
+        return callTool(token, "execute", executeArgs(name, command, sessionId, timeoutSeconds, environmentVariables));
+    }
+
+    private Map<String, Object> executeArgs(String name, String command, String sessionId, Integer timeoutSeconds,
+                                            Map<String, Object> environmentVariables) {
+        var args = new HashMap<String, Object>();
+        args.put("reasoningAndExpectations", "test");
+        args.put("name", name);
+        args.put("command", command);
+        args.put("sessionId", sessionId);
+        args.put("timeoutSeconds", timeoutSeconds != null ? timeoutSeconds : 30);
+        if (environmentVariables != null) {
+            args.put("environmentVariables", environmentVariables);
+        }
+        return args;
     }
 
     @SneakyThrows

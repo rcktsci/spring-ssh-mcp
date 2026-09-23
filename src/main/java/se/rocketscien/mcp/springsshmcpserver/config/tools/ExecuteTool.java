@@ -1,5 +1,7 @@
 package se.rocketscien.mcp.springsshmcpserver.config.tools;
 
+import java.util.Map;
+
 import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
@@ -32,14 +34,15 @@ public class ExecuteTool {
             @ToolParam(description = "Server name") String name,
             @ToolParam(description = "Command to execute") String command,
             @ToolParam(description = "Generate once itself (alphanumeric 10+) and reuse the same value") String sessionId,
-            @ToolParam(description = "Timeout in seconds (optional, default 30)", required = false) Integer timeoutSeconds
+            @ToolParam(description = "Timeout in seconds (optional, default 30)", required = false) Integer timeoutSeconds,
+            @ToolParam(description = "Environment variables to set for this command (name -> value), optional", required = false) Map<String, String> environmentVariables
     ) {
         try {
             authService.requireRole("EXECUTE");
             if (!authService.canExecuteOnServer(name)) {
                 throw new AuthException("Server not allowed for this token");
             }
-            ExecutionHistoryEntity result = serverManagementService.execute(sessionId, name, command, timeoutSeconds);
+            ExecutionHistoryEntity result = serverManagementService.execute(sessionId, name, command, timeoutSeconds, environmentVariables);
             return objectMapper.writeValueAsString(new ExecuteResult(
                     result.getResult(),
                     result.getExitCode(),

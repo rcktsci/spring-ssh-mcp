@@ -3,6 +3,8 @@ package se.rocketscien.mcp.springsshmcpserver.tests.tools;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import se.rocketscien.mcp.springsshmcpserver.tests.BaseCallToolTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -172,6 +174,51 @@ class ExecuteTest extends BaseCallToolTest {
         assertThat(r.get("stdout").asText()).contains("line1");
         assertThat(r.get("stdout").asText()).contains("line2");
         assertThat(r.get("exit_code").asInt()).isEqualTo(0);
+    }
+
+    @Test
+    void environment_variable_is_set_for_command() {
+        addServerConnection("test-ssh");
+        var r = getExecResult(executeWithEnv("test-ssh", "echo \"$MY_VAR\"", "env-session", 10,
+                Map.of("MY_VAR", "my-value")));
+        assertThat(r.get("stdout").asText().trim()).isEqualTo("my-value");
+        assertThat(r.get("exit_code").asInt()).isEqualTo(0);
+    }
+
+    @Test
+    void multiple_environment_variables_are_set() {
+        addServerConnection("test-ssh");
+        var r = getExecResult(executeWithEnv("test-ssh", "echo $A-$B", "env-multi", 10,
+                Map.of("A", "one", "B", "two")));
+        assertThat(r.get("stdout").asText().trim()).isEqualTo("one-two");
+        assertThat(r.get("exit_code").asInt()).isEqualTo(0);
+    }
+
+    @Test
+    void environment_variable_value_with_special_characters() {
+        addServerConnection("test-ssh");
+        var r = getExecResult(executeWithEnv("test-ssh", "printf '%s' \"$MSG\"", "env-special", 10,
+                Map.of("MSG", "hello world 'quoted' $HOME")));
+        assertThat(r.get("stdout").asText()).isEqualTo("hello world 'quoted' $HOME");
+        assertThat(r.get("exit_code").asInt()).isEqualTo(0);
+    }
+
+    @Test
+    void environment_variables_preserve_shell_semantics() {
+        addServerConnection("test-ssh");
+        var r = getExecResult(executeWithEnv("test-ssh", "cd /tmp && pwd && echo $FOO", "env-shell", 10,
+                Map.of("FOO", "bar")));
+        assertThat(r.get("stdout").asText()).contains("/tmp");
+        assertThat(r.get("stdout").asText()).contains("bar");
+        assertThat(r.get("exit_code").asInt()).isEqualTo(0);
+    }
+
+    @Test
+    void invalid_environment_variable_name_returns_error() {
+        addServerConnection("test-ssh");
+        var text = getResponseText(executeWithEnv("test-ssh", "whoami", "env-invalid", 10,
+                Map.of("1BAD", "x")));
+        assertThat(text).contains("Invalid environment variable name");
     }
 
     @Test
