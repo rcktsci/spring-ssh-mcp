@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
 
   spring-ssh-mcp:
-    image: ghcr.io/rcktsci/spring-ssh-mcp:2026-10-15
+    image: ghcr.io/rcktsci/spring-ssh-mcp:2026-10-14
     pull_policy: always
     environment:
       SERVER_PORT: 3111
