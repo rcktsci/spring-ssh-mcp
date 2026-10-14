@@ -297,4 +297,55 @@ class ExecuteTest extends BaseCallToolTest {
         var response = execute("pve/prod", "echo hello", "s1", 30, WILDCARD_TOKEN);
         assertThat(getResponseText(response)).contains("Server not allowed");
     }
+
+    @Test
+    void execute_through_jump_host_succeeds() {
+        addServerConnectionVia("jump-host", null);
+        addServerConnectionVia("target-server", "jump-host", "localhost", 22);
+
+        var r = getExecResult(execute("target-server", "whoami", "jump-session", 15));
+
+        assertThat(r.get("stdout").asText().trim()).isEqualTo("root");
+        assertThat(r.get("exit_code").asInt()).isEqualTo(0);
+    }
+
+    @Test
+    void execute_without_jump_host_still_connects_directly() {
+        addServerConnectionVia("plain-server", null);
+
+        var r = getExecResult(execute("plain-server", "whoami", "plain-session", 10));
+
+        assertThat(r.get("stdout").asText().trim()).isEqualTo("root");
+    }
+
+    @Test
+    void execute_with_unknown_jump_host_returns_clear_error() {
+        addServerConnectionVia("target-server", "no-such-jump");
+
+        var text = getResponseText(execute("target-server", "whoami", "missing-jump", 10));
+
+        assertThat(text).contains("Server not found").contains("no-such-jump");
+    }
+
+    @Test
+    void connect_via_cycle_is_bounded_by_the_depth_limit() {
+        addServerConnectionVia("a", null);
+        addServerConnectionVia("b", "a");
+        addServerConnectionVia("a", "b");
+
+        var text = getResponseText(execute("a", "whoami", "cycle-session", 10));
+
+        assertThat(text).contains("exceeds 10 connections");
+    }
+
+    @Test
+    void execute_through_two_jump_hosts_succeeds() {
+        addServerConnectionVia("jump-1", null);
+        addServerConnectionVia("jump-2", "jump-1", "localhost", 22);
+        addServerConnectionVia("target-server", "jump-2", "localhost", 22);
+
+        var r = getExecResult(execute("target-server", "whoami", "two-hop-session", 20));
+
+        assertThat(r.get("stdout").asText().trim()).isEqualTo("root");
+    }
 }

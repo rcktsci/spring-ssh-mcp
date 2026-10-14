@@ -543,6 +543,65 @@ class ServerApiTest extends BaseRestTest {
                 .isEqualTo("Server not found: 4242");
     }
 
+    @Test
+    void create_server_with_connect_via_returns_it() {
+        createPasswordServer("bastion", "secret");
+        var created = createServer(requestBody(
+                "name", "app-1",
+                "host", "10.0.0.1",
+                "username", "deploy",
+                "password", "secret",
+                "connectVia", "bastion"));
+
+        assertThat(serverRepository.findById(created.get("id").asLong()).orElseThrow().getConnectVia())
+                .isEqualTo("bastion");
+        assertThat(serverView("app-1").get("connectVia").asText()).isEqualTo("bastion");
+        assertThat(serverView("bastion").get("connectVia").isNull()).isTrue();
+    }
+
+    @Test
+    void create_server_with_unknown_connect_via_is_accepted() {
+        var created = createServer(requestBody(
+                "name", "app-1",
+                "host", "10.0.0.1",
+                "username", "deploy",
+                "password", "secret",
+                "connectVia", "not-registered-yet"));
+
+        assertThat(savedServer(created.get("id").asLong()).getConnectVia()).isEqualTo("not-registered-yet");
+    }
+
+    @Test
+    void update_server_sets_connect_via() {
+        var id = createPasswordServer();
+
+        patchServer(id, requestBody("connectVia", "bastion"));
+
+        assertThat(savedServer(id).getConnectVia()).isEqualTo("bastion");
+        assertThat(serverView("web-1").get("connectVia").asText()).isEqualTo("bastion");
+    }
+
+    @Test
+    void update_server_without_connect_via_keeps_stored_one() {
+        var id = createPasswordServer();
+        patchServer(id, requestBody("connectVia", "bastion"));
+
+        patchServer(id, requestBody("host", "10.0.0.9"));
+
+        assertThat(savedServer(id).getConnectVia()).isEqualTo("bastion");
+    }
+
+    @Test
+    void update_server_with_blank_connect_via_clears_it() {
+        var id = createPasswordServer();
+        patchServer(id, requestBody("connectVia", "bastion"));
+
+        patchServer(id, requestBody("connectVia", ""));
+
+        assertThat(savedServer(id).getConnectVia()).isNull();
+        assertThat(serverView("web-1").get("connectVia").isNull()).isTrue();
+    }
+
     private JsonNode serverView(String name) {
         var response = get("/servers");
 

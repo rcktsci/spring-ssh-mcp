@@ -3,6 +3,9 @@ package se.rocketscien.mcp.springsshmcpserver.ssh;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -32,46 +35,100 @@ public class SshService {
     public record SshExecutionResult(String stdout, int exitCode, boolean timedOut) {
     }
 
-    public SshExecutionResult executeCommand(ServerEntity server, String command, int timeoutSeconds,
+    /**
+     * Runs {@code command} on {@code target}, reached through {@code chain}. The chain holds every server the
+     * connection passes through, in connect order, with the target last; a single entry is a direct connection.
+     * Each hop is a separate SSH connection authenticated with that server's own credentials.
+     */
+    public SshExecutionResult executeCommand(List<ServerEntity> chain, String command, int timeoutSeconds,
                                              Map<String, String> environmentVariables) {
         String effectiveCommand = withEnvironmentVariables(command, environmentVariables);
         ensurePayloadFits(effectiveCommand);
-        var host = server.getHost();
-        var port = server.getPort();
-        log.info("Connecting to {}:{} as {}", host, port, server.getUsername());
-        try (SSHClient sshClient = new SSHClient()) {
-            sshClient.addHostKeyVerifier(new PromiscuousVerifier());
-            log.info("Attempting connection to {}:{}", host, port);
-            sshClient.connect(host, port);
-            log.info("Connected successfully to {}:{}", host, port);
 
-            if (server.getPassword() != null) {
-                String password = encryptionService.decrypt(server.getPassword());
-                log.info("Authenticating with password for user '{}'", server.getUsername());
-                sshClient.authPassword(server.getUsername(), password);
-            } else if (server.getPrivateKey() != null) {
-                String privateKey = encryptionService.decrypt(server.getPrivateKey());
-                String rawPassphrase = server.getPrivateKeySecret();
-                log.info("Authenticating with key for user '{}'", server.getUsername());
-                KeyProvider keyProvider;
-                if (rawPassphrase == null || rawPassphrase.isEmpty()) {
-                    keyProvider = sshClient.loadKeys(privateKey, null, null);
-                } else {
-                    String passphrase = encryptionService.decrypt(rawPassphrase);
-                    keyProvider = sshClient.loadKeys(privateKey, null, new SshPasswordFinder(passphrase));
-                }
-                sshClient.authPublickey(server.getUsername(), keyProvider);
-            }
+        var target = chain.get(chain.size() - 1);
+        var host = target.getHost();
+        var port = target.getPort();
+        int envCount = environmentVariables == null ? 0 : environmentVariables.size();
+        log.info("Executing command on {}:{} as {} through {} ({} env var(s)): '{}'", host, port, target.getUsername(),
+                 chain.size() == 1 ? "a direct connection" : (chain.size() - 1) + " jump host(s)", envCount,
+                 abbreviate(command));
 
-            int envCount = environmentVariables == null ? 0 : environmentVariables.size();
-            log.info("Executing command on {}:{} ({} env var(s)): '{}'", host, port, envCount, abbreviate(command));
-            return executeInternal(sshClient, effectiveCommand, timeoutSeconds);
+        try {
+            return executeChain(chain, effectiveCommand, timeoutSeconds);
         } catch (IOException ex) {
             log.error("SSH I/O failure on {}:{} - {}", host, port, describe(ex), ex);
             throw new RuntimeException("SSH connection error (connection lost or channel rejected): " + describe(ex), ex);
         } catch (Exception ex) {
             log.error("SSH execution failed on {}:{} - {}", host, port, describe(ex), ex);
             throw new RuntimeException("SSH execution failed: " + describe(ex), ex);
+        }
+    }
+
+    /**
+     * Opens one connection per hop and runs the command on the last one. The clients are pushed before their
+     * first fallible call, so the {@code finally} always owns them, and popped in reverse: the target is
+     * closed before the jump hosts it was tunnelled through.
+     */
+    private SshExecutionResult executeChain(List<ServerEntity> chain, String command, int timeoutSeconds)
+            throws IOException {
+        Deque<SSHClient> clients = new ArrayDeque<>();
+        try {
+            SSHClient previous = null;
+            for (ServerEntity hop : chain) {
+                SSHClient client = newClient();
+                clients.push(client);
+                if (previous == null) {
+                    log.info("Connecting to {}:{} as {}", hop.getHost(), hop.getPort(), hop.getUsername());
+                    client.connect(hop.getHost(), hop.getPort());
+                } else {
+                    log.info("Tunnelling to {}:{} as {}", hop.getHost(), hop.getPort(), hop.getUsername());
+                    client.connectVia(previous.newDirectConnection(hop.getHost(), hop.getPort()));
+                }
+                log.info("Connected successfully to {}:{}", hop.getHost(), hop.getPort());
+                authenticate(client, hop);
+                previous = client;
+            }
+
+            return executeInternal(clients.peek(), command, timeoutSeconds);
+        } finally {
+            while (!clients.isEmpty()) {
+                closeQuietly(clients.pop());
+            }
+        }
+    }
+
+    private static SSHClient newClient() {
+        SSHClient client = new SSHClient();
+        client.addHostKeyVerifier(new PromiscuousVerifier());
+        return client;
+    }
+
+    /** Closing a jump host reports the same errors as a failed command, so they are logged and dropped. */
+    private static void closeQuietly(SSHClient client) {
+        try {
+            client.close();
+        } catch (IOException ex) {
+            log.warn("Error while closing an SSH connection: {}", describe(ex));
+        }
+    }
+
+    private void authenticate(SSHClient sshClient, ServerEntity server) throws IOException {
+        if (server.getPassword() != null) {
+            String password = encryptionService.decrypt(server.getPassword());
+            log.info("Authenticating with password for user '{}'", server.getUsername());
+            sshClient.authPassword(server.getUsername(), password);
+        } else if (server.getPrivateKey() != null) {
+            String privateKey = encryptionService.decrypt(server.getPrivateKey());
+            String rawPassphrase = server.getPrivateKeySecret();
+            log.info("Authenticating with key for user '{}'", server.getUsername());
+            KeyProvider keyProvider;
+            if (rawPassphrase == null || rawPassphrase.isEmpty()) {
+                keyProvider = sshClient.loadKeys(privateKey, null, null);
+            } else {
+                String passphrase = encryptionService.decrypt(rawPassphrase);
+                keyProvider = sshClient.loadKeys(privateKey, null, new SshPasswordFinder(passphrase));
+            }
+            sshClient.authPublickey(server.getUsername(), keyProvider);
         }
     }
 

@@ -1,5 +1,8 @@
 package se.rocketscien.mcp.springsshmcpserver.service;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -19,22 +22,56 @@ public class ServerManagementService {
 
     private static final int DEFAULT_TIMEOUT = 30;
 
+    /**
+     * How many SSH connections one command may open, jump hosts included. It is the only guard on a
+     * {@code connect_via} cycle: {@link #resolveChain} walks a bounded number of hops and reports the cycle
+     * once the walk runs out, instead of following it forever.
+     */
+    private static final int MAX_CONNECTIONS = 10;
+
     private final ServerRepository serverRepository;
     private final ExecutionHistoryRepository executionHistoryRepository;
     private final SshService sshService;
     private final SecretEncryptionService encryptionService;
 
-    public Map<String, String> listServers() {
+    public record ServerInfo(String address, String connectVia) {
+    }
+
+    public Map<String, ServerInfo> listServers() {
         return serverRepository.findAll()
                 .stream()
                 .collect(Collectors.toMap(
                         ServerEntity::getName,
-                        ServerEntity::getAddress
+                        server -> new ServerInfo(server.getAddress(), server.getConnectVia())
                 ));
     }
 
+    /**
+     * Walks {@code connect_via} from the target towards the first hop and returns the connections to open, in
+     * connect order with the target last. An unknown name is reported here rather than on write, so a server can
+     * be stored before the jump host it names exists.
+     */
+    private List<ServerEntity> resolveChain(ServerEntity target) {
+        var chain = new ArrayList<ServerEntity>(MAX_CONNECTIONS);
+        var current = target;
+        for (int i = 0; i < MAX_CONNECTIONS; i++) {
+            chain.add(current);
+            var jumpName = current.getConnectVia();
+            if (jumpName == null || jumpName.isBlank()) {
+                Collections.reverse(chain);
+                return chain;
+            }
+            var owner = current;
+            current = serverRepository.findByName(jumpName)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Server not found: " + jumpName + " (connect_via of '" + owner.getName() + "')"));
+        }
+        throw new IllegalArgumentException("connect_via chain from '" + target.getName() + "' exceeds "
+                + MAX_CONNECTIONS + " connections (cycle?)");
+    }
+
     public ServerEntity addServer(
-            String name, String host, Integer port, String username,
+            String name, String host, Integer port, String username, String connectVia,
             String password, String privateKey, String privateKeySecret, boolean overwrite
     ) {
         if ((password == null && privateKey == null) || (password != null && privateKey != null)) {
@@ -50,6 +87,7 @@ public class ServerManagementService {
             server.setHost(host);
             server.setPort(port != null ? port : 22);
             server.setUsername(username);
+            server.setConnectVia(blankToNull(connectVia));
             server.setPassword(password != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(password) : null);
             server.setPrivateKey(privateKey != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(privateKey) : null);
             server.setPrivateKeySecret(privateKeySecret != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(privateKeySecret) : null);
@@ -61,6 +99,7 @@ public class ServerManagementService {
         server.setHost(host);
         server.setPort(port != null ? port : 22);
         server.setUsername(username);
+        server.setConnectVia(blankToNull(connectVia));
         server.setPassword(password != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(password) : null);
         server.setPrivateKey(privateKey != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(privateKey) : null);
         server.setPrivateKeySecret(privateKeySecret != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(privateKeySecret) : null);
@@ -98,7 +137,7 @@ public class ServerManagementService {
      * </ul>
      */
     public ServerEntity updateServer(
-            Long id, String name, String host, Integer port, String username,
+            Long id, String name, String host, Integer port, String username, String connectVia,
             String password, String privateKey, String privateKeySecret
     ) {
         var server = serverRepository.findById(id)
@@ -136,6 +175,10 @@ public class ServerManagementService {
         }
         if (port != null) {
             server.setPort(port);
+        }
+        // Same rule as a secret: absent leaves the stored jump host alone, blank clears it.
+        if (connectVia != null) {
+            server.setConnectVia(blankToNull(connectVia));
         }
 
         applySecrets(server, newPassword, newPrivateKey, newPrivateKeySecret);
@@ -186,7 +229,7 @@ public class ServerManagementService {
         int timeout = timeoutSeconds != null && timeoutSeconds > 0 ? timeoutSeconds : DEFAULT_TIMEOUT;
 
         SshService.SshExecutionResult result = sshService.executeCommand(
-                server, command, timeout, environmentVariables
+                resolveChain(server), command, timeout, environmentVariables
         );
 
         ExecutionHistoryEntity exec = new ExecutionHistoryEntity();

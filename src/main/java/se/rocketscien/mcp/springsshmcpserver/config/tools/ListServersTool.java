@@ -18,9 +18,9 @@ public class ListServersTool {
 
     @Tool(
             name = "list_servers",
-            description = "List all registered server connections (name -> user@host:port)"
+            description = "List all registered server connections with the jump host each is reached through"
     )
-    public Map<String, String> listServers() {
+    public Map<String, ServerManagementService.ServerInfo> listServers() {
         var all = serverManagementService.listServers();
 
         var token = AuthService.CURRENT.get();

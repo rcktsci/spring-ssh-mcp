@@ -43,6 +43,14 @@ public class ServerEntity {
     @Column(columnDefinition = "TEXT")
     private String privateKeySecret;
 
+    /**
+     * Name of another registered server used as a jump host to reach this one, or {@code null} for a direct
+     * connection. Stored as a plain name rather than a reference: the value is the admin's responsibility, and
+     * {@link ServerManagementService#resolveChain} resolves it at connect time and reports an unknown name there.
+     */
+    @Column
+    private String connectVia;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 

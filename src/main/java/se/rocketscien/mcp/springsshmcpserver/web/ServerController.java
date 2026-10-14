@@ -65,6 +65,7 @@ public class ServerController {
                                                        request.host(),
                                                        port != null ? port : DEFAULT_PORT,
                                                        request.username(),
+                                                       request.connectVia(),
                                                        request.password(),
                                                        request.privateKey(),
                                                        // addServer stores a passphrase unconditionally, so a password
@@ -86,6 +87,7 @@ public class ServerController {
                                                           request.host(),
                                                           port,
                                                           request.username(),
+                                                          request.connectVia(),
                                                           request.password(),
                                                           request.privateKey(),
                                                           request.privateKeySecret());
@@ -145,19 +147,21 @@ public class ServerController {
                 entity.getPort(),
                 entity.getUsername(),
                 entity.getAuthType(),
+                entity.getConnectVia(),
                 entity.getCreatedAt());
     }
 
     /**
      * Secrets are accepted on write and never returned: {@link ServerView} carries {@code authType} instead.
-     * {@code port} is a {@code String} on purpose — see {@link #parsePort(String)}.
+     * {@code port} is a {@code String} on purpose — see {@link #parsePort(String)}. On PATCH an omitted
+     * {@code connectVia} keeps the stored jump host and {@code ""} clears it, the same rule the secrets use.
      */
     public record ServerRequest(String name, String host, String port, String username, String password,
-                                String privateKey, String privateKeySecret) {
+                                String privateKey, String privateKeySecret, String connectVia) {
     }
 
     public record ServerView(Long id, String name, String host, Integer port, String username, String authType,
-                             LocalDateTime createdAt) {
+                             String connectVia, LocalDateTime createdAt) {
     }
 
     /** Both writes answer with the identity alone: the server, and its {@code authType}, are read back from

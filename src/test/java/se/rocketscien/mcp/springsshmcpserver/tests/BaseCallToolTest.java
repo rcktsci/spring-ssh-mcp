@@ -4,10 +4,10 @@ import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,6 +92,30 @@ public class BaseCallToolTest extends BaseApplicationTest {
                 "username", "root",
                 "password", "testpassword"
         ));
+    }
+
+    /** Registers a server reached through another one, addressed as this host reaches the SSH container. */
+    protected String addServerConnectionVia(String name, String connectVia) {
+        return addServerConnectionVia(name, connectVia, SSH_CONTAINER.getHost(), SSH_CONTAINER.getMappedPort(22));
+    }
+
+    /**
+     * Registers a server with an explicit address. A jump host resolves the target inside its own container, so
+     * a target behind one is addressed by the container's port 22 rather than by the published host port.
+     */
+    protected String addServerConnectionVia(String name, String connectVia, String host, int port) {
+        var args = new HashMap<String, Object>();
+        args.put("name", name);
+        args.put("host", host);
+        args.put("port", port);
+        args.put("username", "root");
+        args.put("password", "testpassword");
+        args.put("overwrite", true);
+        if (connectVia != null) {
+            args.put("connectVia", connectVia);
+        }
+
+        return callTool(FULL_ACCESS_TOKEN, "add_server_connection", args);
     }
 
     protected void addServerConnection(String name, Integer port, String privateKey, String passphrase) {
@@ -198,9 +222,13 @@ public class BaseCallToolTest extends BaseApplicationTest {
         return sseBody;
     }
 
+    /** {@code list_servers} rows by server name, for the assertions that read a single field. */
     @SneakyThrows
-    protected Map<String, String> parseServerMap(String rawResponse) {
-        return objectMapper.readValue(getResponseText(rawResponse), new TypeReference<>() {});
+    protected Map<String, JsonNode> parseServerMap(String rawResponse) {
+        var root = objectMapper.readTree(getResponseText(rawResponse));
+        var servers = new LinkedHashMap<String, JsonNode>();
+        root.properties().forEach(entry -> servers.put(entry.getKey(), entry.getValue()));
+        return servers;
     }
 
     @SneakyThrows

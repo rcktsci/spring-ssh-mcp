@@ -337,6 +337,7 @@
                 <th>id</th>
                 <th>name</th>
                 <th>адрес</th>
+                <th>через</th>
                 <th>авторизация</th>
                 <th>создан</th>
                 <th></th>
@@ -381,6 +382,10 @@
         <label>username
             <input id="s-username" required>
         </label>
+        <label>connect_via (промежуточный сервер) <span id="s-connect-via-hint">(пусто — напрямую)</span>
+            <input id="s-connect-via" list="server-names">
+        </label>
+        <datalist id="server-names"></datalist>
         <fieldset class="segmented">
             <legend>Способ входа</legend>
             <label><input type="radio" name="auth-mode" value="password" checked> Пароль</label>
@@ -571,15 +576,24 @@
     function renderServers(servers) {
         const body = el('servers-body');
         body.replaceChildren();
+        // The jump host is a name, not a reference, so the field offers every registered name. Nothing stops
+        // a server from naming itself: that is a cycle, and the connection depth limit is what stops it.
+        const names = el('server-names');
+        names.replaceChildren();
         for (const server of servers) {
             const row = body.insertRow();
             cell(row, server.id);
             cell(row, server.name);
             const address = cell(row, addressOf(server), 'mono cell-token');
             address.append(copyButton(addressOf(server)));
+            cell(row, server.connectVia ?? '—');
             cell(row, AUTH_TYPE_LABELS.get(server.authType) ?? server.authType);
             cell(row, when(server.createdAt), 'cell-when');
             rowActions(row, 'Изменить', () => openServerDialog(server), () => deleteServer(server));
+
+            const option = document.createElement('option');
+            option.value = server.name;
+            names.append(option);
         }
     }
 
@@ -633,6 +647,7 @@
         el('s-host').value = server?.host ?? '';
         el('s-port').value = server?.port ?? '';
         el('s-username').value = server?.username ?? '';
+        el('s-connect-via').value = server?.connectVia ?? '';
         // Secrets are never returned, so the fields start empty and an empty field is left out of the
         // request body below — that is what "оставьте пустым, чтобы не менять" means.
         el('s-password').value = '';
@@ -644,6 +659,9 @@
         // The two modes do not mean the same thing: create defaults an absent port to 22, edit keeps
         // the stored one, so the label says which.
         el('s-port-hint').textContent = server ? '(пусто — не менять)' : '(пусто — 22)';
+        // Same rule as the port: an empty field is never sent, so on edit it means "keep the stored jump host"
+        // and cannot be used to clear it — the REST API clears it with an empty string.
+        el('s-connect-via-hint').textContent = server ? '(пусто — не менять)' : '(пусто — напрямую)';
         el('server-dialog').showModal();
     }
 
@@ -666,6 +684,12 @@
         const port = el('s-port').value;
         if (port !== '') {
             request.port = Number(port);
+        }
+        // Blank means "leave the stored jump host alone", the same rule the secret fields follow, so an edit
+        // that never touched the field cannot clear it.
+        const connectVia = el('s-connect-via').value.trim();
+        if (connectVia !== '') {
+            request.connectVia = connectVia;
         }
         // The server reads a blank secret as an unfilled field, so the field is left out of the body
         // entirely: sending "" is a different request, not "unchanged". Only the chosen mode is sent,

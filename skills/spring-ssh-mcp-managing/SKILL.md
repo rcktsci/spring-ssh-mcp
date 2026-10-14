@@ -46,6 +46,28 @@ add_server_connection(name="prod", host="192.168.1.1", username="root",
 
 `overwrite` (optional, default `false`) controls whether an existing server with the same name is replaced.
 
+### Reaching a server through a jump host
+
+`connectVia` (optional) names another registered server to reach this one through:
+
+```
+add_server_connection(name="app-prod", host="10.0.0.15", username="deploy",
+          privateKey="-----BEGIN RSA PRIVATE KEY-----\n...",
+          connectVia="bastion")
+```
+
+`bastion` is an ordinary server entry with its own host, port and credentials; each hop authenticates separately
+and may itself name another hop. The value is a plain name that nothing validates on write, so it can be stored
+before `bastion` exists and is **not** rewritten if `bastion` is later renamed — fix such a reference with a new
+`add_server_connection(..., overwrite=true)` call. A name that resolves to nothing fails when the command runs,
+and a command opens at most 10 connections, which is what bounds a `connect_via` cycle.
+
+`add_server_connection(..., overwrite=true)` rewrites the whole record: omitting `connectVia` there clears a
+stored jump host, unlike `PATCH` where an omitted field keeps it. The Web UI always sends the field only when it
+is not empty, so clearing a jump host there is not possible — use the REST API with `"connectVia": ""`.
+
+`list_servers` reports the jump host of every server it returns.
+
 ### PEM vs OpenSSH key format
 
 sshj (the MCP library) supports **ONLY PEM**:

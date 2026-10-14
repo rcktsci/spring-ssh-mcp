@@ -48,6 +48,14 @@ public class BaseApplicationTest {
     static void setupSshKeys() {
         SSH_CONTAINER.start();
 
+        // A jump host is reached through a direct-tcpip channel, and the image ships AllowTcpForwarding no,
+        // which makes every such channel fail to open. sshd runs as PID 1, so it cannot be restarted; SIGHUP
+        // re-reads the config in place and leaves the container up.
+        SSH_CONTAINER.execInContainer("sh", "-c",
+                                      "sed -i 's/^AllowTcpForwarding no/AllowTcpForwarding yes/' /etc/ssh/sshd_config");
+        SSH_CONTAINER.execInContainer("sh", "-c", "kill -HUP 1");
+        Thread.sleep(1000);
+
         SSH_CONTAINER.execInContainer("sh", "-c", "ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N '' -C 'test-key' -m PEM");
         SSH_CONTAINER.execInContainer("sh", "-c", "ssh-keygen -t rsa -b 2048 -f /tmp/test_key_encrypted -N 'testpassphrase' -C 'test-key-encrypted' -m PEM");
 
