@@ -88,7 +88,7 @@
         <dependency>
             <groupId>com.hierynomus</groupId>
             <artifactId>sshj</artifactId>
-            <version>0.40.0</version>
+            <version>0.41.2</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
