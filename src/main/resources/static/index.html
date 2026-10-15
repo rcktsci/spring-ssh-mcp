@@ -509,10 +509,32 @@
     }
 
     function copy(text) {
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText(text).catch((error) => console.error('copy failed', error));
+        // navigator.clipboard only exists in a secure context. The panel is documented as
+        // http://<hostname>:3111/, so over plain HTTP it is absent and the button would do nothing at all.
+        if (window.isSecureContext && navigator.clipboard) {
+            navigator.clipboard.writeText(text).catch(() => copyViaHiddenField(text));
         } else {
-            console.error('clipboard is unavailable, copy the value manually');
+            copyViaHiddenField(text);
+        }
+    }
+
+    /** The fallback that does work over plain HTTP, as long as it runs on the click that asked for it. */
+    function copyViaHiddenField(text) {
+        const field = document.createElement('textarea');
+        field.value = text;
+        field.setAttribute('readonly', '');
+        // Kept in the layout so the click keeps focus, but invisible so it never shows on screen.
+        field.style.position = 'fixed';
+        field.style.top = '0';
+        field.style.opacity = '0';
+        document.body.append(field);
+        field.select();
+        try {
+            document.execCommand('copy');
+        } catch (error) {
+            console.error('copy failed', error);
+        } finally {
+            field.remove();
         }
     }
 
