@@ -5,6 +5,8 @@ MCP server for accessing remote SSH servers.
 ## Features
 
 - Authentication with password or private key (optionally with passphrase)
+- OTP autopilot: a stored TOTP secret (Base32, e.g. from FreeOTP/Google Authenticator) is used to
+  auto-answer a keyboard-interactive one-time-code prompt during connection (`totp_secret`)
 - Passwords, keys, and passphrases are stored encrypted in PostgreSQL
 - Bearer token authorization (two roles: EDIT/EXECUTE, wildcard-based server filtering), tokens stored in PostgreSQL
 - Command history table keyed by `sessionId`
@@ -44,6 +46,22 @@ target's address is read from its own stored record, so a token cannot redirect 
   the target only, because the token never runs commands on the hops — it only passes through them. The hop
   names are still visible in `list_servers`, including for a hop the token is not allowed to execute on.
 - On `PATCH`, an omitted `connectVia` keeps the stored value and an empty string clears it.
+
+## OTP (TOTP) autopilot
+
+A server whose SSH login asks for a one-time code (keyboard-interactive OTP, common with Google Authenticator,
+FreeOTP, or PAM `google-authenticator`) can store a TOTP secret in the `totp_secret` column. At connect time
+the server generates the current 6-digit code and answers the OTP prompt automatically; a password prompt in
+the same keyboard-interactive session is answered with the stored password.
+
+- The secret is the Base32 `secret=...` part of the `otpauth://totp/...` URI exported from the authenticator
+  app. It is stored encrypted exactly like passwords and keys, validated on write, and never returned by the API.
+- On `add_server_connection` the optional `totpSecret` argument sets it; an absent secret on `overwrite=true`
+  clears the stored one (same rule as the other secrets).
+- On `PATCH` an omitted `totpSecret` keeps the stored value; an explicit empty string clears it.
+- Limitation: the code is generated from the server's current clock; if the server's clock drifts far from the
+  client's, the OTP window may be missed (most servers accept a ±1 step skew).
+
 
 ## Access tokens
 

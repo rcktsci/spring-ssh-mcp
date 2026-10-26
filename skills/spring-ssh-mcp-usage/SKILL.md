@@ -76,6 +76,16 @@ The SSH server rejected all methods. Common causes:
 - Key in OpenSSH format instead of PEM
 - PasswordAuth disabled and the key not added to authorized_keys
 - Key not in the user's authorized_keys
+- The server requires a one-time code (OTP) but the server has no TOTP secret set — the error message names
+  this case; set `totpSecret` (Base32, from FreeOTP/Google Authenticator) on the server and retry.
+
+### OTP / TOTP (two-factor authentication)
+
+Servers that ask for a one-time code during login (keyboard-interactive) are supported automatically: store the
+Base32 `secret=...` part of the `otpauth://totp/...` URI as the server's `totpSecret`. At connect time the
+MCP server generates the current code and answers the OTP prompt; a password prompt in the same session is
+answered with the stored password. The code is generated from the server clock, so a very large clock skew can
+miss the 30-second window.
 
 ### "Connection refused"
 
