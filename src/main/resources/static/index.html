@@ -407,12 +407,15 @@
         <label>totpSecret (OTP, необязательно)
             <input id="s-totp-secret" type="password" autocomplete="new-password">
         </label>
+        <label id="s-totp-clear-row" hidden>
+            <input id="s-totp-clear" type="checkbox"> удалить сохранённый OTP-секрет
+        </label>
         <p class="hint">
             Если сервер при входе спрашивает одноразовый код (OTP) — вставьте сюда Base32-секрет
             из FreeOTP / Google Authenticator (часть <code>secret=...</code> из <code>otpauth://</code>-URI).
             Код будет генерироваться автоматически при каждом подключении. Пустое поле — «не менять»
             (на редактировании) или «без OTP» (при создании); чтобы снять OTP с существующего сервера,
-            отправьте <code>totpSecret: ""</code> в REST-запросе.
+            отметьте чекбокс «удалить сохранённый OTP-секрет».
         </p>
         <p id="server-edit-hint" class="hint" hidden>
             API никогда не возвращает секреты, поэтому поля пароля, ключа и passphrase пустые —
@@ -689,6 +692,11 @@
         el('s-private-key').value = '';
         el('s-passphrase').value = '';
         el('s-totp-secret').value = '';
+        // The clear checkbox is only relevant on edit, and only when the server actually stores an OTP
+        // secret (the authType carries a "+OTP" suffix then); on create there is nothing to clear.
+        const hasOtp = (server?.authType ?? '').endsWith('+OTP');
+        el('s-totp-clear-row').hidden = !hasOtp;
+        el('s-totp-clear').checked = false;
         // Open on the mode the server already uses, so editing never looks like a mode change. The authType
         // carries a "+OTP" suffix when a TOTP secret is stored, so compare the base mode only.
         const serverAuthType = server?.authType ?? '';
@@ -742,10 +750,14 @@
                 request[field] = value;
             }
         }
-        // OTP secret is orthogonal to the auth mode and follows the same blank rule: empty = not sent = keep
-        // the stored value on edit.
+        // OTP secret is orthogonal to the auth mode: empty field = not sent = keep the stored value on
+        // edit, unless the explicit "clear" checkbox is checked, which sends the empty string the REST
+        // API uses to delete the secret.
+        const clearTotp = el('s-totp-clear').checked;
         const totpSecret = el('s-totp-secret').value.trim();
-        if (totpSecret !== '') {
+        if (clearTotp) {
+            request.totpSecret = '';
+        } else if (totpSecret !== '') {
             request.totpSecret = totpSecret;
         }
         return request;
