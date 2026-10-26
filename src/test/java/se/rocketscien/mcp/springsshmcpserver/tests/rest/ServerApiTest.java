@@ -200,6 +200,7 @@ class ServerApiTest extends BaseRestTest {
                 .doesNotContain("password")
                 .doesNotContain("privateKey")
                 .doesNotContain("privateKeySecret")
+                .doesNotContain("totpSecret")
                 .doesNotContain("aes:")
                 .doesNotContain("address");
         assertThat(serverView("pass-1").get("authType").asText()).isEqualTo("PASSWORD");
@@ -600,6 +601,66 @@ class ServerApiTest extends BaseRestTest {
 
         assertThat(savedServer(id).getConnectVia()).isNull();
         assertThat(serverView("web-1").get("connectVia").isNull()).isTrue();
+    }
+
+    @Test
+    void create_server_with_totp_secret_encrypts_it_and_marks_auth_type() {
+        var created = createServer(requestBody(
+                "name", "web-1",
+                "host", "10.0.0.1",
+                "username", "deploy",
+                "password", "secret",
+                "totpSecret", "JBSWY3DPEHPK3PXP"));
+
+        var saved = savedServer(created.get("id").asLong());
+        assertThat(encryptionService.decrypt(saved.getTotpSecret())).isEqualTo("JBSWY3DPEHPK3PXP");
+        assertThat(saved.getAuthType()).isEqualTo("PASSWORD+OTP");
+        assertThat(serverView("web-1").get("authType").asText()).isEqualTo("PASSWORD+OTP");
+    }
+
+    @Test
+    void create_server_with_invalid_totp_secret_returns_error() {
+        var response = post("/servers", requestBody(
+                "name", "web-1",
+                "host", "10.0.0.1",
+                "username", "deploy",
+                "password", "secret",
+                "totpSecret", "not-base32!"));
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(objectMapper.readTree(response.body()).get("error").asText()).contains("Base32");
+        assertThat(serverRepository.count()).isZero();
+    }
+
+    @Test
+    void update_server_without_totp_secret_keeps_stored_one() {
+        var id = createServer(requestBody(
+                "name", "web-1",
+                "host", "10.0.0.1",
+                "username", "deploy",
+                "password", "secret",
+                "totpSecret", "JBSWY3DPEHPK3PXP")).get("id").asLong();
+
+        patchServer(id, requestBody("host", "10.0.0.9"));
+
+        assertThat(savedServer(id).getTotpSecret()).isNotNull();
+        assertThat(encryptionService.decrypt(savedServer(id).getTotpSecret())).isEqualTo("JBSWY3DPEHPK3PXP");
+    }
+
+    @Test
+    void update_server_with_blank_totp_secret_clears_it() {
+        var id = createServer(requestBody(
+                "name", "web-1",
+                "host", "10.0.0.1",
+                "username", "deploy",
+                "password", "secret",
+                "totpSecret", "JBSWY3DPEHPK3PXP")).get("id").asLong();
+
+        patchServer(id, requestBody("totpSecret", ""));
+
+        var saved = savedServer(id);
+        assertThat(saved.getTotpSecret()).isNull();
+        assertThat(saved.getAuthType()).isEqualTo("PASSWORD");
     }
 
     private JsonNode serverView(String name) {

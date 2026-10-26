@@ -43,6 +43,9 @@ public class ServerEntity {
     @Column(columnDefinition = "TEXT")
     private String privateKeySecret;
 
+    @Column(columnDefinition = "TEXT")
+    private String totpSecret;
+
     /**
      * Name of another registered server used as a jump host to reach this one, or {@code null} for a direct
      * connection. Stored as a plain name rather than a reference: the value is the admin's responsibility, and
@@ -63,12 +66,14 @@ public class ServerEntity {
      * field), so this getter is invisible to Hibernate.
      */
     public String getAuthType() {
+        String base;
         if (password != null) {
-            return "PASSWORD";
+            base = "PASSWORD";
+        } else if (privateKey == null) {
+            base = "NONE";
+        } else {
+            base = privateKeySecret != null ? "PRIVATE_KEY_WITH_PASS" : "PRIVATE_KEY";
         }
-        if (privateKey == null) {
-            return "NONE";
-        }
-        return privateKeySecret != null ? "PRIVATE_KEY_WITH_PASS" : "PRIVATE_KEY";
+        return totpSecret != null ? base + "+OTP" : base;
     }
 }

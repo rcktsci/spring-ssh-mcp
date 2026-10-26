@@ -36,6 +36,7 @@ public class AddServerTool {
             @ToolParam(description = "Password for authentication (plain text, stored as base64)", required = false) String password,
             @ToolParam(description = "Private key for authentication (OpenSSH format, plain text, not base64)", required = false) String privateKey,
             @ToolParam(description = "Passphrase for encrypted private key (optional, plain text, not base64)", required = false) String privateKeySecret,
+            @ToolParam(description = "TOTP secret (Base32, from FreeOTP/Google Authenticator) for auto-answering an OTP prompt. Optional; on overwrite an absent secret clears the stored one.", required = false) String totpSecret,
             @ToolParam(description = "Overwrite existing server if name already exists (default false)", required = false) Boolean overwrite
     ) {
         try {
@@ -48,6 +49,7 @@ public class AddServerTool {
                                                                     password,
                                                                     privateKey,
                                                                     privateKeySecret,
+                                                                    totpSecret,
                                                                     overwrite != null ? overwrite : false);
             return objectMapper.writeValueAsString(new SuccessResult("Success: " + server.getName()));
         } catch (IllegalArgumentException ex) {

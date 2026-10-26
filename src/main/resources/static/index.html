@@ -404,6 +404,16 @@
                 <input id="s-passphrase" type="password" autocomplete="new-password">
             </label>
         </div>
+        <label>totpSecret (OTP, необязательно)
+            <input id="s-totp-secret" type="password" autocomplete="new-password">
+        </label>
+        <p class="hint">
+            Если сервер при входе спрашивает одноразовый код (OTP) — вставьте сюда Base32-секрет
+            из FreeOTP / Google Authenticator (часть <code>secret=...</code> из <code>otpauth://</code>-URI).
+            Код будет генерироваться автоматически при каждом подключении. Пустое поле — «не менять»
+            (на редактировании) или «без OTP» (при создании); чтобы снять OTP с существующего сервера,
+            отправьте <code>totpSecret: ""</code> в REST-запросе.
+        </p>
         <p id="server-edit-hint" class="hint" hidden>
             API никогда не возвращает секреты, поэтому поля пароля, ключа и passphrase пустые —
             оставьте их пустыми, чтобы не менять сохранённые значения.
@@ -460,8 +470,11 @@
     /** A value the API never returns: {@code authType} is what the UI has instead of the secrets. */
     const AUTH_TYPE_LABELS = new Map([
         ['PASSWORD', 'пароль'],
+        ['PASSWORD+OTP', 'пароль + OTP'],
         ['PRIVATE_KEY', 'ключ'],
         ['PRIVATE_KEY_WITH_PASS', 'ключ + passphrase'],
+        ['PRIVATE_KEY+OTP', 'ключ + OTP'],
+        ['PRIVATE_KEY_WITH_PASS+OTP', 'ключ + passphrase + OTP'],
         ['NONE', '—']
     ]);
 
@@ -675,8 +688,11 @@
         el('s-password').value = '';
         el('s-private-key').value = '';
         el('s-passphrase').value = '';
-        // Open on the mode the server already uses, so editing never looks like a mode change.
-        setAuthMode(server && server.authType === 'PRIVATE_KEY' || server?.authType === 'PRIVATE_KEY_WITH_PASS' ? 'key' : 'password');
+        el('s-totp-secret').value = '';
+        // Open on the mode the server already uses, so editing never looks like a mode change. The authType
+        // carries a "+OTP" suffix when a TOTP secret is stored, so compare the base mode only.
+        const serverAuthType = server?.authType ?? '';
+        setAuthMode(serverAuthType.startsWith('PRIVATE_KEY') ? 'key' : 'password');
         el('server-edit-hint').hidden = !server;
         // The two modes do not mean the same thing: create defaults an absent port to 22, edit keeps
         // the stored one, so the label says which.
@@ -725,6 +741,12 @@
             if (value.trim() !== '') {
                 request[field] = value;
             }
+        }
+        // OTP secret is orthogonal to the auth mode and follows the same blank rule: empty = not sent = keep
+        // the stored value on edit.
+        const totpSecret = el('s-totp-secret').value.trim();
+        if (totpSecret !== '') {
+            request.totpSecret = totpSecret;
         }
         return request;
     }

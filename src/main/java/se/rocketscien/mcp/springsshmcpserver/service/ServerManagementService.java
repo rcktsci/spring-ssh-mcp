@@ -15,6 +15,7 @@ import se.rocketscien.mcp.springsshmcpserver.domain.ExecutionHistoryRepository;
 import se.rocketscien.mcp.springsshmcpserver.domain.ServerEntity;
 import se.rocketscien.mcp.springsshmcpserver.domain.ServerRepository;
 import se.rocketscien.mcp.springsshmcpserver.ssh.SshService;
+import se.rocketscien.mcp.springsshmcpserver.ssh.TotpGenerator;
 
 @Service
 @RequiredArgsConstructor
@@ -72,7 +73,7 @@ public class ServerManagementService {
 
     public ServerEntity addServer(
             String name, String host, Integer port, String username, String connectVia,
-            String password, String privateKey, String privateKeySecret, boolean overwrite
+            String password, String privateKey, String privateKeySecret, String totpSecret, boolean overwrite
     ) {
         if ((password == null && privateKey == null) || (password != null && privateKey != null)) {
             throw new IllegalArgumentException("Exactly one of password or private key must be provided");
@@ -91,6 +92,7 @@ public class ServerManagementService {
             server.setPassword(password != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(password) : null);
             server.setPrivateKey(privateKey != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(privateKey) : null);
             server.setPrivateKeySecret(privateKeySecret != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(privateKeySecret) : null);
+            server.setTotpSecret(encryptOptionalSecret(totpSecret));
             return serverRepository.save(server);
         }
 
@@ -103,8 +105,24 @@ public class ServerManagementService {
         server.setPassword(password != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(password) : null);
         server.setPrivateKey(privateKey != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(privateKey) : null);
         server.setPrivateKeySecret(privateKeySecret != null ? EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(privateKeySecret) : null);
+        server.setTotpSecret(encryptOptionalSecret(totpSecret));
 
         return serverRepository.save(server);
+    }
+
+    /**
+     * Encrypts a TOTP secret after validating it decodes from Base32: a malformed secret would otherwise
+     * surface only as a connection-time failure on a server that may already be in use.
+     */
+    private String encryptOptionalSecret(String totpSecret) {
+        String value = blankToNull(totpSecret);
+        if (value == null) {
+            return null;
+        }
+        if (!TotpGenerator.isValidSecret(value)) {
+            throw new IllegalArgumentException("TOTP secret must be a valid Base32 string (e.g. the secret=... part of an otpauth:// URI)");
+        }
+        return EncryptionConstants.ENCRYPTED_PREFIX + encryptionService.encrypt(value);
     }
 
     public void removeServer(String name) {
@@ -138,7 +156,7 @@ public class ServerManagementService {
      */
     public ServerEntity updateServer(
             Long id, String name, String host, Integer port, String username, String connectVia,
-            String password, String privateKey, String privateKeySecret
+            String password, String privateKey, String privateKeySecret, String totpSecret
     ) {
         var server = serverRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Server not found: " + id));
@@ -182,6 +200,12 @@ public class ServerManagementService {
         }
 
         applySecrets(server, newPassword, newPrivateKey, newPrivateKeySecret);
+
+        // TOTP secret mirrors connectVia semantics: omitted keeps the stored value, an explicit empty string
+        // clears it.
+        if (totpSecret != null) {
+            server.setTotpSecret(totpSecret.isBlank() ? null : encryptOptionalSecret(totpSecret));
+        }
 
         return serverRepository.save(server);
     }

@@ -73,6 +73,7 @@ public class ServerController {
                                                        // authType ever mentions: a later PATCH of a bare privateKey would
                                                        // keep it and silently make the server PRIVATE_KEY_WITH_PASS.
                                                        request.password() != null ? null : request.privateKeySecret(),
+                                                       request.totpSecret(),
                                                        false);
         return new ServerSummary(created.getId(), created.getName());
     }
@@ -90,7 +91,8 @@ public class ServerController {
                                                           request.connectVia(),
                                                           request.password(),
                                                           request.privateKey(),
-                                                          request.privateKeySecret());
+                                                          request.privateKeySecret(),
+                                                          request.totpSecret());
         return new ServerSummary(updated.getId(), updated.getName());
     }
 
@@ -154,10 +156,11 @@ public class ServerController {
     /**
      * Secrets are accepted on write and never returned: {@link ServerView} carries {@code authType} instead.
      * {@code port} is a {@code String} on purpose — see {@link #parsePort(String)}. On PATCH an omitted
-     * {@code connectVia} keeps the stored jump host and {@code ""} clears it, the same rule the secrets use.
+     * {@code connectVia} keeps the stored jump host and {@code ""} clears it; the same rule applies to
+     * {@code totpSecret}, while the other secrets keep their value when blank.
      */
     public record ServerRequest(String name, String host, String port, String username, String password,
-                                String privateKey, String privateKeySecret, String connectVia) {
+                                String privateKey, String privateKeySecret, String connectVia, String totpSecret) {
     }
 
     public record ServerView(Long id, String name, String host, Integer port, String username, String authType,

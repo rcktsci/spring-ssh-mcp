@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +17,12 @@ import lombok.extern.slf4j.Slf4j;
 import net.schmizz.sshj.SSHClient;
 import net.schmizz.sshj.connection.channel.direct.Session;
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier;
+import net.schmizz.sshj.userauth.UserAuthException;
 import net.schmizz.sshj.userauth.keyprovider.KeyProvider;
+import net.schmizz.sshj.userauth.method.AuthKeyboardInteractive;
+import net.schmizz.sshj.userauth.method.AuthMethod;
+import net.schmizz.sshj.userauth.method.AuthPassword;
+import net.schmizz.sshj.userauth.method.AuthPublickey;
 import net.schmizz.sshj.userauth.password.PasswordFinder;
 import net.schmizz.sshj.userauth.password.Resource;
 import org.jspecify.annotations.NonNull;
@@ -113,14 +119,59 @@ public class SshService {
     }
 
     private void authenticate(SSHClient sshClient, ServerEntity server) throws IOException {
-        if (server.getPassword() != null) {
-            String password = encryptionService.decrypt(server.getPassword());
-            log.info("Authenticating with password for user '{}'", server.getUsername());
-            sshClient.authPassword(server.getUsername(), password);
+        if (server.getTotpSecret() == null) {
+            authenticateLegacy(sshClient, server);
+        } else {
+            authenticateWithOtp(sshClient, server);
+        }
+    }
+
+    /** The pre-OTP path, untouched: password or key, exactly as before the feature. */
+    private void authenticateLegacy(SSHClient sshClient, ServerEntity server) throws IOException {
+        try {
+            if (server.getPassword() != null) {
+                String password = encryptionService.decrypt(server.getPassword());
+                log.info("Authenticating with password for user '{}'", server.getUsername());
+                sshClient.authPassword(server.getUsername(), password);
+            } else if (server.getPrivateKey() != null) {
+                String privateKey = encryptionService.decrypt(server.getPrivateKey());
+                String rawPassphrase = server.getPrivateKeySecret();
+                log.info("Authenticating with key for user '{}'", server.getUsername());
+                KeyProvider keyProvider;
+                if (rawPassphrase == null || rawPassphrase.isEmpty()) {
+                    keyProvider = sshClient.loadKeys(privateKey, null, null);
+                } else {
+                    String passphrase = encryptionService.decrypt(rawPassphrase);
+                    keyProvider = sshClient.loadKeys(privateKey, null, new SshPasswordFinder(passphrase));
+                }
+                sshClient.authPublickey(server.getUsername(), keyProvider);
+            }
+        } catch (UserAuthException ex) {
+            // A failed login is often the first sign of an OTP requirement: the server rejects every method
+            // when a second factor is missing. Name it, so the admin knows what to configure.
+            throw new IOException("SSH authentication failed: " + describe(ex)
+                    + " (if the server requires a one-time OTP code, set a TOTP secret for it)", ex);
+        }
+    }
+
+    /**
+     * Runs the stored base method first, then keyboard-interactive, so both single-method servers and the
+     * OpenSSH chains {@code password,keyboard-interactive} / {@code publickey,keyboard-interactive} work:
+     * the base method succeeds alone when the server needs no OTP, and the interactive provider answers the
+     * OTP prompt when it does. A provider error (unrecognized prompt) is a hard failure, not a silent retry.
+     */
+    private void authenticateWithOtp(SSHClient sshClient, ServerEntity server) throws IOException {
+        String password = server.getPassword() != null ? encryptionService.decrypt(server.getPassword()) : null;
+        String secret = encryptionService.decrypt(server.getTotpSecret());
+
+        List<AuthMethod> methods = new ArrayList<>();
+        if (password != null) {
+            log.info("Authenticating with password + OTP for user '{}'", server.getUsername());
+            methods.add(new AuthPassword(new SshPasswordFinder(password)));
         } else if (server.getPrivateKey() != null) {
             String privateKey = encryptionService.decrypt(server.getPrivateKey());
             String rawPassphrase = server.getPrivateKeySecret();
-            log.info("Authenticating with key for user '{}'", server.getUsername());
+            log.info("Authenticating with key + OTP for user '{}'", server.getUsername());
             KeyProvider keyProvider;
             if (rawPassphrase == null || rawPassphrase.isEmpty()) {
                 keyProvider = sshClient.loadKeys(privateKey, null, null);
@@ -128,7 +179,14 @@ public class SshService {
                 String passphrase = encryptionService.decrypt(rawPassphrase);
                 keyProvider = sshClient.loadKeys(privateKey, null, new SshPasswordFinder(passphrase));
             }
-            sshClient.authPublickey(server.getUsername(), keyProvider);
+            methods.add(new AuthPublickey(keyProvider));
+        }
+        methods.add(new AuthKeyboardInteractive(new OtpChallengeProvider(password, secret)));
+
+        try {
+            sshClient.auth(server.getUsername(), methods);
+        } catch (UserAuthException | RuntimeException ex) {
+            throw new IOException("OTP authentication failed: " + describe(ex), ex);
         }
     }
 
