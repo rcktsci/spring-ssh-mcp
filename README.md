@@ -90,6 +90,13 @@ To disable auto-bootstrap (for example, in production where the first admin is p
 
 See [docker-compose.yml](docker-compose.yml). Run with `docker compose up -d`.
 
+The image is published from `main` on every push as
+`ghcr.io/rcktsci/spring-ssh-mcp:<date>`, e.g. pull the latest release with:
+
+```sh
+docker pull ghcr.io/rcktsci/spring-ssh-mcp:2026-10-26
+```
+
 ## Web UI
 
 Admin panel: `http://<hostname>:3111/`. Add/edit/remove servers and auth tokens.
