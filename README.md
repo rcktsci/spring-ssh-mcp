@@ -94,8 +94,15 @@ The image is published from `main` on every push as
 `ghcr.io/rcktsci/spring-ssh-mcp:<date>`, e.g. pull the latest release with:
 
 ```sh
-docker pull ghcr.io/rcktsci/spring-ssh-mcp:2026-10-26
+docker pull ghcr.io/rcktsci/spring-ssh-mcp:2026-11-23
 ```
+
+## MCP protocol
+
+The server speaks the stateless streamable HTTP transport and supports the MCP protocol revision
+`2026-07-28` (via the MCP Java SDK bundled with Spring AI 2.1.0). Tool calls are accepted with
+`arguments` both as a JSON object and as an array of `{name, value}` pairs, so clients that use the
+newest protocol revisions work without downgrading.
 
 ## Web UI
 
